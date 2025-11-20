@@ -1,13 +1,13 @@
 [gd_resource type="TileSet" load_steps=17 format=3 uid="uid://tayrg5g1nh5u"]
 
-[ext_resource type="Texture2D" uid="uid://dc5pmdby3bcma" path="res://floor-1.png" id="1"]
-[ext_resource type="Texture2D" uid="uid://bi4nd2ikeuaq2" path="res://floor-2.png" id="2"]
-[ext_resource type="Texture2D" uid="uid://c6ua5vmg7lifc" path="res://floor-3.png" id="3"]
-[ext_resource type="Texture2D" uid="uid://uvr6e4mgdhko" path="res://floor-4.png" id="4"]
-[ext_resource type="Texture2D" uid="uid://b5m6pl5k6685f" path="res://wall-1.png" id="5"]
-[ext_resource type="Texture2D" uid="uid://dhoo5wup5o43j" path="res://wall-2.png" id="6"]
-[ext_resource type="Texture2D" uid="uid://b4mersvfy7ssj" path="res://wall-3.png" id="7"]
-[ext_resource type="Texture2D" uid="uid://b6jqimw7ubdlp" path="res://wall-4.png" id="8"]
+[ext_resource type="Texture2D" uid="uid://dc5pmdby3bcma" path="res://assets/floor-1.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://bi4nd2ikeuaq2" path="res://assets/floor-2.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://c6ua5vmg7lifc" path="res://assets/floor-3.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://uvr6e4mgdhko" path="res://assets/floor-4.png" id="4"]
+[ext_resource type="Texture2D" uid="uid://b5m6pl5k6685f" path="res://assets/wall-1.png" id="5"]
+[ext_resource type="Texture2D" uid="uid://dhoo5wup5o43j" path="res://assets/wall-2.png" id="6"]
+[ext_resource type="Texture2D" uid="uid://b4mersvfy7ssj" path="res://assets/wall-3.png" id="7"]
+[ext_resource type="Texture2D" uid="uid://b6jqimw7ubdlp" path="res://assets/wall-4.png" id="8"]
 
 [sub_resource type="TileSetAtlasSource" id="1"]
 texture = ExtResource("1")

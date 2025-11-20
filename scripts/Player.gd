@@ -38,15 +38,17 @@ func _process(delta: float) -> void:
 		return
 	if not _can_act:
 		return
+	# Support cardinal and diagonal movement by combining axes
 	var dir := Vector2i(0, 0)
+	if Input.is_action_pressed("move_left"):
+		dir.x -= 1
+	if Input.is_action_pressed("move_right"):
+		dir.x += 1
 	if Input.is_action_pressed("move_up"):
-		dir = Vector2i(0, -1)
-	elif Input.is_action_pressed("move_down"):
-		dir = Vector2i(0, 1)
-	elif Input.is_action_pressed("move_left"):
-		dir = Vector2i(-1, 0)
-	elif Input.is_action_pressed("move_right"):
-		dir = Vector2i(1, 0)
+		dir.y -= 1
+	if Input.is_action_pressed("move_down"):
+		dir.y += 1
+	# Opposing keys cancel out, resulting in 0 on that axis.
 	if dir != Vector2i(0, 0):
 		_try_move(dir)
 		_move_cooldown = _move_repeat_time

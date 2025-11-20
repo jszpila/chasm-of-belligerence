@@ -10,25 +10,25 @@ const SOURCES_WALL := [4, 5, 6, 7]
 const FIXED_GRID_W := 48
 const FIXED_GRID_H := 36
 const BONE_TEXTURES: Array[Texture2D] = [
-	preload("res://bones-1.png"),
-	preload("res://bones-2.png"),
-	preload("res://bones-3.png"),
+	preload("res://assets/bones-1.png"),
+	preload("res://assets/bones-2.png"),
+	preload("res://assets/bones-3.png"),
 ]
-const DOOR_TEX_1: Texture2D = preload("res://door-1.png")
-const DOOR_TEX_2: Texture2D = preload("res://door-2.png")
-const PLAYER_TEX_1: Texture2D = preload("res://player-1.png")
-const PLAYER_TEX_2: Texture2D = preload("res://player-2.png")
-const PLAYER_TEX_3: Texture2D = preload("res://player-3.png")
-const PLAYER_TEX_4: Texture2D = preload("res://player-4.png")
-const HEART_TEX: Texture2D = preload("res://heart.png")
-const DEAD_GOBLIN_TEX: Texture2D = preload("res://goblin-2.png")
-const SFX_PICKUP1: AudioStream = preload("res://pickup-1.wav")
-const SFX_PICKUP2: AudioStream = preload("res://pickup-2.wav")
-const SFX_HURT1: AudioStream = preload("res://hurt-1.wav")
-const SFX_HURT2: AudioStream = preload("res://hurt-2.wav")
-const SFX_HURT3: AudioStream = preload("res://hurt-3.wav")
-const SFX_DOOR_OPEN: AudioStream = preload("res://door-open.wav")
-const SFX_START: AudioStream = preload("res://start.wav")
+const DOOR_TEX_1: Texture2D = preload("res://assets/door-1.png")
+const DOOR_TEX_2: Texture2D = preload("res://assets/door-2.png")
+const PLAYER_TEX_1: Texture2D = preload("res://assets/player-1.png")
+const PLAYER_TEX_2: Texture2D = preload("res://assets/player-2.png")
+const PLAYER_TEX_3: Texture2D = preload("res://assets/player-3.png")
+const PLAYER_TEX_4: Texture2D = preload("res://assets/player-4.png")
+const HEART_TEX: Texture2D = preload("res://assets/heart.png")
+const DEAD_GOBLIN_TEX: Texture2D = preload("res://assets/goblin-2.png")
+const SFX_PICKUP1: AudioStream = preload("res://assets/pickup-1.wav")
+const SFX_PICKUP2: AudioStream = preload("res://assets/pickup-2.wav")
+const SFX_HURT1: AudioStream = preload("res://assets/hurt-1.wav")
+const SFX_HURT2: AudioStream = preload("res://assets/hurt-2.wav")
+const SFX_HURT3: AudioStream = preload("res://assets/hurt-3.wav")
+const SFX_DOOR_OPEN: AudioStream = preload("res://assets/door-open.wav")
+const SFX_START: AudioStream = preload("res://assets/start.wav")
 
 @onready var floor_map: TileMap = $Floor
 @onready var walls_map: TileMap = $Walls
