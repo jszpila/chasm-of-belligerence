@@ -29,6 +29,9 @@ const SFX_HURT2: AudioStream = preload("res://assets/hurt-2.wav")
 const SFX_HURT3: AudioStream = preload("res://assets/hurt-3.wav")
 const SFX_DOOR_OPEN: AudioStream = preload("res://assets/door-open.wav")
 const SFX_START: AudioStream = preload("res://assets/start.wav")
+const SIGHT_INNER_TILES := 5
+const SIGHT_OUTER_TILES := 10
+const SIGHT_MAX_DARK := 0.8
 
 @onready var floor_map: TileMap = $Floor
 @onready var walls_map: TileMap = $Walls
@@ -56,6 +59,9 @@ const SFX_START: AudioStream = preload("res://assets/start.wav")
 @onready var _over_bg_lose: TextureRect = $GameOver/OverBGLose
 @onready var _door_node: Node2D = $Door
 @onready var _door_sprite: Sprite2D = $Door/Sprite2D
+var _fov_overlay: Node2D
+var _fov_visible: Array[bool] = []
+var _fov_dist: Array[float] = []
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _key_cell: Vector2i = Vector2i.ZERO
@@ -107,6 +113,7 @@ func _process(_delta: float) -> void:
 		if Input.is_action_just_pressed("restart") or Input.is_action_just_pressed("start"):
 			_restart_game()
 		return
+	# FOV overlay updates only when player moves or world changes
 	var wp := Vector2i(round(player.global_position.x), round(player.global_position.y))
 	var cp := Grid.world_to_cell(player.global_position)
 	if _game_over:
@@ -186,6 +193,7 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 		if _rng.randf() <= 0.75:
 			var d: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
 			_move_goblin(i, d)
+	_update_fov()
 
 func _move_goblin(index: int, dir: Vector2i) -> void:
 	var dest := _goblin_cells[index] + dir
@@ -359,12 +367,14 @@ func _restart_game() -> void:
 	var grid_size := _get_grid_size()
 	_grid_size = grid_size
 	_build_test_map(grid_size)
+	_ensure_fov_overlay()
 	_place_player(Vector2i(int(grid_size.x / 2), int(grid_size.y / 2)))
 	_place_random_inner_walls(grid_size)
 	_place_random_entities(grid_size)
 	_clear_bones()
 	_place_bones(grid_size)
 	_place_door(grid_size)
+	_update_fov()
 	# Show entities
 	if _key_node:
 		_key_node.visible = true
@@ -484,12 +494,14 @@ func _start_game() -> void:
 	var grid_size := _get_grid_size()
 	_grid_size = grid_size
 	_build_test_map(grid_size)
+	_ensure_fov_overlay()
 	_place_player(Vector2i(int(grid_size.x / 2), int(grid_size.y / 2)))
 	_place_random_inner_walls(grid_size)
 	_place_random_entities(grid_size)
 	_clear_bones()
 	_place_bones(grid_size)
 	_place_door(grid_size)
+	_update_fov()
 	# Enable controls
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(true)
@@ -518,6 +530,8 @@ func _set_world_visible(visible: bool) -> void:
 	floor_map.visible = visible
 	walls_map.visible = visible
 	player.visible = visible
+	if _fov_overlay:
+		_fov_overlay.visible = visible
 	if _key_node:
 		_key_node.visible = visible and not _key_collected
 	if _sword_node:
@@ -538,6 +552,91 @@ func _set_world_visible(visible: bool) -> void:
 	if _potion_node:
 		_potion_node.visible = visible and not _potion_collected
 	_update_hud_icons()
+
+func _ensure_fov_overlay() -> void:
+	if _fov_overlay == null:
+		var fov := preload("res://scripts/FOVOverlay.gd").new()
+		fov.name = "FOVOverlay"
+		fov.z_index = 100
+		fov.z_as_relative = false
+		fov.cell_size = Grid.CELL_SIZE
+		add_child(fov)
+		_fov_overlay = fov
+	# size arrays and overlay to grid
+	var total: int = _grid_size.x * _grid_size.y
+	_fov_visible.resize(total)
+	_fov_dist.resize(total)
+	for i in range(total):
+		_fov_visible[i] = false
+		_fov_dist[i] = 1e9
+	(_fov_overlay as Node).call_deferred("set_grid", _grid_size)
+	_update_fov()
+
+func _update_fov() -> void:
+	if _grid_size == Vector2i.ZERO:
+		return
+	var total: int = _grid_size.x * _grid_size.y
+	if _fov_visible.size() != total:
+		_fov_visible.resize(total)
+		_fov_dist.resize(total)
+	for i in range(total):
+		_fov_visible[i] = false
+		_fov_dist[i] = 1e9
+	var center: Vector2i = Grid.world_to_cell(player.global_position)
+	var radius: int = SIGHT_OUTER_TILES
+	if _in_bounds(center):
+		var center_idx: int = center.y * _grid_size.x + center.x
+		_fov_visible[center_idx] = true
+		_fov_dist[center_idx] = 0.0
+	var xmin: int = max(0, center.x - radius)
+	var xmax: int = min(_grid_size.x - 1, center.x + radius)
+	var ymin: int = max(0, center.y - radius)
+	var ymax: int = min(_grid_size.y - 1, center.y + radius)
+	for y in range(ymin, ymax + 1):
+		for x in range(xmin, xmax + 1):
+			var c: Vector2i = Vector2i(x, y)
+			var dtiles: float = float(max(abs(c.x - center.x), abs(c.y - center.y)))
+			if dtiles > float(radius):
+				continue
+			var line: Array[Vector2i] = _bresenham(center, c)
+			for p in line:
+				if not _in_bounds(p):
+					break
+				var i: int = p.y * _grid_size.x + p.x
+				var dist: float = sqrt(pow(float(p.x - center.x), 2.0) + pow(float(p.y - center.y), 2.0))
+				_fov_visible[i] = true
+				_fov_dist[i] = min(_fov_dist[i], dist)
+				if _is_wall(p) and p != center:
+					break
+	if _fov_overlay:
+		(_fov_overlay as Node).call_deferred("update_fov", _fov_visible, _fov_dist, SIGHT_INNER_TILES, SIGHT_OUTER_TILES, SIGHT_MAX_DARK)
+
+func _in_bounds(cell: Vector2i) -> bool:
+	return cell.x >= 0 and cell.y >= 0 and cell.x < _grid_size.x and cell.y < _grid_size.y
+
+func _bresenham(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+	var points: Array[Vector2i] = []
+	var x0: int = a.x
+	var y0: int = a.y
+	var x1: int = b.x
+	var y1: int = b.y
+	var dx: int = abs(x1 - x0)
+	var sx: int = (1 if x0 < x1 else -1)
+	var dy: int = -abs(y1 - y0)
+	var sy: int = (1 if y0 < y1 else -1)
+	var err: int = dx + dy
+	while true:
+		points.append(Vector2i(x0, y0))
+		if x0 == x1 and y0 == y1:
+			break
+		var e2: int = 2 * err
+		if e2 >= dy:
+			err += dy
+			x0 += sx
+		if e2 <= dx:
+			err += dx
+			y0 += sy
+	return points
 
 func _spawn_goblin_at(cell: Vector2i) -> void:
 	var node: Node2D
