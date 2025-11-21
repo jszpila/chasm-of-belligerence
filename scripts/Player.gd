@@ -65,6 +65,19 @@ func _try_move(delta_cell: Vector2i) -> void:
 			parent._combat_round(idx)
 			_end_turn()
 			return
+	# If a zombie or minotaur is at destination, run one combat round and do not step into the cell
+	if parent and parent.has_method("_get_zombie_index_at") and parent.has_method("_combat_round_zombie"):
+		var zidx: int = parent._get_zombie_index_at(dest)
+		if zidx >= 0:
+			parent._combat_round_zombie(zidx)
+			_end_turn()
+			return
+	if parent and parent.has_method("_get_minotaur_index_at") and parent.has_method("_combat_round_minotaur"):
+		var midx: int = parent._get_minotaur_index_at(dest)
+		if midx >= 0:
+			parent._combat_round_minotaur(midx)
+			_end_turn()
+			return
 	_grid_pos = dest
 	global_position = Grid.cell_to_world(_grid_pos)
 	emit_signal("moved", _grid_pos)

@@ -23,6 +23,10 @@ const PLAYER_TEX_3: Texture2D = preload("res://assets/player-3.png")
 const PLAYER_TEX_4: Texture2D = preload("res://assets/player-4.png")
 const HEART_TEX: Texture2D = preload("res://assets/heart.png")
 const DEAD_GOBLIN_TEX: Texture2D = preload("res://assets/goblin-2.png")
+const ZOMBIE_TEX_1: Texture2D = preload("res://assets/zombie-1.png")
+const ZOMBIE_TEX_2: Texture2D = preload("res://assets/zombie-2.png")
+const MINO_TEX_1: Texture2D = preload("res://assets/minotaur-1.png")
+const MINO_TEX_2: Texture2D = preload("res://assets/minotaur-2.png")
 const SFX_PICKUP1: AudioStream = preload("res://assets/pickup-1.wav")
 const SFX_PICKUP2: AudioStream = preload("res://assets/pickup-2.wav")
 const SFX_HURT1: AudioStream = preload("res://assets/hurt-1.wav")
@@ -89,6 +93,14 @@ var _won: bool = false
 var _goblin_nodes: Array[Node2D] = []
 var _goblin_cells: Array[Vector2i] = []
 var _goblin_alive: Array[bool] = []
+var _zombie_nodes: Array[Node2D] = []
+var _zombie_cells: Array[Vector2i] = []
+var _zombie_alive: Array[bool] = []
+var _zombie_hp: Array[int] = []
+var _minotaur_nodes: Array[Node2D] = []
+var _minotaur_cells: Array[Vector2i] = []
+var _minotaur_alive: Array[bool] = []
+var _minotaur_hp: Array[int] = []
 var _potion2_node: Node2D
 var _rune1_node: Node2D
 var _rune2_node: Node2D
@@ -222,6 +234,16 @@ func _process(_delta: float) -> void:
 			if _goblin_alive.size() > i and _goblin_alive[i] and cp == _goblin_cells[i]:
 				_resolve_combat(i)
 				break
+		# Check zombie contact
+		for zi in range(_zombie_cells.size()):
+			if _zombie_alive.size() > zi and _zombie_alive[zi] and cp == _zombie_cells[zi]:
+				_combat_round_zombie(zi)
+				break
+		# Check minotaur contact
+		for mi in range(_minotaur_cells.size()):
+			if _minotaur_alive.size() > mi and _minotaur_alive[mi] and cp == _minotaur_cells[mi]:
+				_combat_round_minotaur(mi)
+				break
 	# Rune pickups: rune-1 (+1 attack) and rune-2 (+1 defense i.e., -1 goblin roll)
 	if not _rune1_collected and cp == _rune1_cell:
 		_rune1_collected = true
@@ -256,6 +278,18 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 		if _rng.randf() <= 0.75:
 			var d: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
 			_move_goblin(i, d)
+	# Move zombie (one per level) with low accuracy towards player, less accurate at distance
+	if _zombie_cells.size() > 0:
+		for i in range(_zombie_cells.size()):
+			if _zombie_alive.size() <= i or not _zombie_alive[i]:
+				continue
+			_move_homing_enemy("zombie", i)
+	# Move minotaur (zero on L1, one on L2) with higher accuracy towards player
+	if _minotaur_cells.size() > 0:
+		for i in range(_minotaur_cells.size()):
+			if _minotaur_alive.size() <= i or not _minotaur_alive[i]:
+				continue
+			_move_homing_enemy("minotaur", i)
 	_update_fov()
 	# Ensure item pickups trigger reliably on the exact moved cell (especially potions)
 	if not _potion_collected and new_cell == _potion_cell:
@@ -297,6 +331,57 @@ func _move_goblin(index: int, dir: Vector2i) -> void:
 	_goblin_cells[index] = dest
 	if _goblin_nodes.size() > index and _goblin_nodes[index]:
 		_goblin_nodes[index].global_position = Grid.cell_to_world(_goblin_cells[index])
+
+func _move_homing_enemy(kind: String, index: int) -> void:
+	var ecell := _zombie_cells[index] if kind == "zombie" else _minotaur_cells[index]
+	var player_cell := Grid.world_to_cell(player.global_position)
+	var delta: Vector2i = player_cell - ecell
+	var dist: int = abs(delta.x) + abs(delta.y)
+	# Determine desired direction towards player
+	var cand: Array[Vector2i] = []
+	if delta.x != 0:
+		cand.append(Vector2i(1 if delta.x > 0 else -1, 0))
+	if delta.y != 0:
+		cand.append(Vector2i(0, 1 if delta.y > 0 else -1))
+	# Accuracy: minotaur more accurate; zombie less, and decreases with distance
+	var p_towards := 0.7
+	if kind == "zombie":
+		p_towards = clamp(0.8 - 0.05 * float(dist), 0.2, 0.8)
+	else:
+		p_towards = clamp(0.95 - 0.02 * float(dist), 0.5, 0.95)
+	var dir := Vector2i.ZERO
+	if _rng.randf() < p_towards and cand.size() > 0:
+		dir = cand[_rng.randi_range(0, cand.size() - 1)]
+	else:
+		# Pick a random direction; slight bias away from player
+		var dirs: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+		dirs.shuffle()
+		for d in dirs:
+			var newd := ecell + d
+			if abs((player_cell - newd).x) + abs((player_cell - newd).y) > dist:
+				dir = d
+				break
+		if dir == Vector2i.ZERO:
+			dir = dirs[0]
+	var dest := ecell + dir
+	if not _in_interior(dest) or _is_wall(dest):
+		return
+	# If moving onto player, do one combat round and don't step
+	if dest == player_cell and not _game_over:
+		if kind == "zombie":
+			_combat_round_zombie(index)
+		else:
+			_combat_round_minotaur(index)
+		return
+	# Move
+	if kind == "zombie":
+		_zombie_cells[index] = dest
+		if _zombie_nodes.size() > index and _zombie_nodes[index]:
+			_zombie_nodes[index].global_position = Grid.cell_to_world(dest)
+	else:
+		_minotaur_cells[index] = dest
+		if _minotaur_nodes.size() > index and _minotaur_nodes[index]:
+			_minotaur_nodes[index].global_position = Grid.cell_to_world(dest)
 
 
 func _build_test_map(grid_size: Vector2i) -> void:
@@ -476,6 +561,18 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	_goblin_nodes.clear()
 	_goblin_cells.clear()
 	_goblin_alive.clear()
+	# Reset zombie/minotaur
+	for child in get_children():
+		if child is Node2D and (child.name.begins_with("Zombie") or child.name.begins_with("Minotaur")):
+			child.queue_free()
+	_zombie_nodes.clear()
+	_zombie_cells.clear()
+	_zombie_alive.clear()
+	_zombie_hp.clear()
+	_minotaur_nodes.clear()
+	_minotaur_cells.clear()
+	_minotaur_alive.clear()
+	_minotaur_hp.clear()
 	# Decide total goblins: base + 0-3 extra
 	var total := 1 + _rng.randi_range(0, 3)
 	var attempts := 0
@@ -500,6 +597,14 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 				continue
 			break
 		_spawn_goblin_at(gcell)
+
+	# Spawn exactly one zombie per level
+	var zcell := _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell])
+	_spawn_zombie_at(zcell)
+	# Spawn minotaur only on level 2, exactly one
+	if _level >= 2:
+		var mcell := _pick_free_interior_cell(grid_size, [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell, zcell])
+		_spawn_minotaur_at(mcell)
 
 func _restart_game() -> void:
 	# Fade to black
@@ -635,6 +740,80 @@ func _combat_round(gidx: int) -> void:
 			if player.has_method("set_control_enabled"):
 				player.set_control_enabled(false)
 
+func _combat_round_zombie(zidx: int) -> void:
+	if _game_over or _zombie_alive.size() <= zidx or not _zombie_alive[zidx]:
+		return
+	var player_roll: int = _rng.randi_range(1, 20)
+	var z_roll: int = _rng.randi_range(1, 20)
+	if _sword_collected:
+		player_roll += 1
+	if _rune1_collected:
+		player_roll += 1
+	if _shield_collected:
+		z_roll -= 1
+	if _rune2_collected:
+		z_roll -= 1
+	print("Player rolls ", player_roll, ", Zombie rolls ", z_roll)
+	if player_roll == z_roll:
+		return
+	if player_roll > z_roll:
+		_play_sfx(SFX_HURT1)
+		_blink_node(_zombie_nodes[zidx])
+		_zombie_hp[zidx] -= 1
+		if _zombie_hp[zidx] <= 0:
+			_zombie_alive[zidx] = false
+			_zombie_nodes[zidx].visible = false
+			_leave_zombie_corpse(_zombie_cells[zidx])
+			_play_sfx(SFX_HURT3)
+	else:
+		_hp_current -= 1
+		print("Player loses 1 HP. HP now:", _hp_current)
+		_update_hud_hearts()
+		_play_sfx(SFX_HURT2)
+		_blink_node(player)
+		if _hp_current <= 0:
+			_game_over = true
+			_won = false
+			if player.has_method("set_control_enabled"):
+				player.set_control_enabled(false)
+
+func _combat_round_minotaur(midx: int) -> void:
+	if _game_over or _minotaur_alive.size() <= midx or not _minotaur_alive[midx]:
+		return
+	var player_roll: int = _rng.randi_range(1, 20)
+	var m_roll: int = _rng.randi_range(1, 20)
+	if _sword_collected:
+		player_roll += 1
+	if _rune1_collected:
+		player_roll += 1
+	if _shield_collected:
+		m_roll -= 1
+	if _rune2_collected:
+		m_roll -= 1
+	print("Player rolls ", player_roll, ", Minotaur rolls ", m_roll)
+	if player_roll == m_roll:
+		return
+	if player_roll > m_roll:
+		_play_sfx(SFX_HURT1)
+		_blink_node(_minotaur_nodes[midx])
+		_minotaur_hp[midx] -= 1
+		if _minotaur_hp[midx] <= 0:
+			_minotaur_alive[midx] = false
+			_minotaur_nodes[midx].visible = false
+			_leave_minotaur_corpse(_minotaur_cells[midx])
+			_play_sfx(SFX_HURT3)
+	else:
+		_hp_current -= 1
+		print("Player loses 1 HP. HP now:", _hp_current)
+		_update_hud_hearts()
+		_play_sfx(SFX_HURT2)
+		_blink_node(player)
+		if _hp_current <= 0:
+			_game_over = true
+			_won = false
+			if player.has_method("set_control_enabled"):
+				player.set_control_enabled(false)
+
 
 
 func _check_win() -> void:
@@ -742,6 +921,10 @@ func _set_world_visible(visible: bool) -> void:
 			_codex_node.visible = visible and special_uncollected
 	for i in range(_goblin_nodes.size()):
 		_goblin_nodes[i].visible = visible and _goblin_alive[i]
+	for i in range(_zombie_nodes.size()):
+		_zombie_nodes[i].visible = visible and _zombie_alive[i]
+	for i in range(_minotaur_nodes.size()):
+		_minotaur_nodes[i].visible = visible and _minotaur_alive[i]
 	if _hud_hearts:
 		_hud_hearts.visible = visible
 	_decor.visible = visible
@@ -851,6 +1034,38 @@ func _spawn_goblin_at(cell: Vector2i) -> void:
 	_goblin_nodes.append(node)
 	_goblin_cells.append(cell)
 	_goblin_alive.append(true)
+	node.visible = true
+	node.global_position = Grid.cell_to_world(cell)
+
+func _spawn_zombie_at(cell: Vector2i) -> void:
+	var node := Node2D.new()
+	node.name = "Zombie"
+	var s := Sprite2D.new()
+	s.centered = false
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	s.texture = ZOMBIE_TEX_1
+	node.add_child(s)
+	add_child(node)
+	_zombie_nodes.append(node)
+	_zombie_cells.append(cell)
+	_zombie_alive.append(true)
+	_zombie_hp.append(1)
+	node.visible = true
+	node.global_position = Grid.cell_to_world(cell)
+
+func _spawn_minotaur_at(cell: Vector2i) -> void:
+	var node := Node2D.new()
+	node.name = "Minotaur"
+	var s := Sprite2D.new()
+	s.centered = false
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	s.texture = MINO_TEX_1
+	node.add_child(s)
+	add_child(node)
+	_minotaur_nodes.append(node)
+	_minotaur_cells.append(cell)
+	_minotaur_alive.append(true)
+	_minotaur_hp.append(2)
 	node.visible = true
 	node.global_position = Grid.cell_to_world(cell)
 
@@ -1072,6 +1287,26 @@ func _leave_goblin_corpse(cell: Vector2i) -> void:
 	s.global_position = Grid.cell_to_world(cell)
 	_decor.add_child(s)
 
+func _leave_zombie_corpse(cell: Vector2i) -> void:
+	if _decor == null:
+		return
+	var s := Sprite2D.new()
+	s.texture = ZOMBIE_TEX_2
+	s.centered = false
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	s.global_position = Grid.cell_to_world(cell)
+	_decor.add_child(s)
+
+func _leave_minotaur_corpse(cell: Vector2i) -> void:
+	if _decor == null:
+		return
+	var s := Sprite2D.new()
+	s.texture = MINO_TEX_2
+	s.centered = false
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	s.global_position = Grid.cell_to_world(cell)
+	_decor.add_child(s)
+
 func _randomize_floor_wall_transform(tm: TileMap, cell: Vector2i) -> void:
 	# Random transform for floor/wall: identity, 90, 180, 270 rotation or horizontal/vertical flip
 	var choice := _rng.randi_range(0, 5)
@@ -1258,5 +1493,17 @@ func _setup_input() -> void:
 func _get_goblin_index_at(cell: Vector2i) -> int:
 	for i in range(_goblin_cells.size()):
 		if _goblin_alive.size() > i and _goblin_alive[i] and _goblin_cells[i] == cell:
+			return i
+	return -1
+
+func _get_zombie_index_at(cell: Vector2i) -> int:
+	for i in range(_zombie_cells.size()):
+		if _zombie_alive.size() > i and _zombie_alive[i] and _zombie_cells[i] == cell:
+			return i
+	return -1
+
+func _get_minotaur_index_at(cell: Vector2i) -> int:
+	for i in range(_minotaur_cells.size()):
+		if _minotaur_alive.size() > i and _minotaur_alive[i] and _minotaur_cells[i] == cell:
 			return i
 	return -1
