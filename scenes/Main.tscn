@@ -13,6 +13,8 @@
 [ext_resource type="Texture2D" uid="uid://dr7hgynepi5no" path="res://assets/shield.png" id="11"]
 [ext_resource type="Texture2D" uid="uid://clc2i6vyqn6km" path="res://assets/potion.png" id="12"]
 [ext_resource type="Texture2D" uid="uid://rmqo6tntxmhq" path="res://assets/codex.png" id="13"]
+[ext_resource type="Texture2D" path="res://assets/rune-1.png" id="14"]
+[ext_resource type="Texture2D" path="res://assets/rune-2.png" id="15"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
@@ -78,6 +80,20 @@ custom_minimum_size = Vector2(24, 24)
 offset_left = 92.0
 offset_top = 32.0
 texture = ExtResource("13")
+
+[node name="HUDRune1Icon" type="TextureRect" parent="HUD"]
+visible = false
+custom_minimum_size = Vector2(24, 24)
+offset_left = 120.0
+offset_top = 32.0
+texture = ExtResource("14")
+
+[node name="HUDRune2Icon" type="TextureRect" parent="HUD"]
+visible = false
+custom_minimum_size = Vector2(24, 24)
+offset_left = 148.0
+offset_top = 32.0
+texture = ExtResource("15")
 
 [node name="Fade" type="ColorRect" parent="HUD"]
 z_index = 100

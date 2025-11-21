@@ -43,6 +43,8 @@ const SIGHT_MAX_DARK := 0.8
 @onready var _hud_icon_sword: TextureRect = $HUD/HUDSwordIcon
 @onready var _hud_icon_shield: TextureRect = $HUD/HUDShieldIcon
 @onready var _hud_icon_codex: TextureRect = $HUD/HUDCodexIcon
+@onready var _hud_icon_rune1: TextureRect = $HUD/HUDRune1Icon
+@onready var _hud_icon_rune2: TextureRect = $HUD/HUDRune2Icon
 @onready var _fade: ColorRect = $HUD/Fade
 @onready var _key_node: Node2D = $Key
 @onready var _sword_node: Node2D = $Sword
@@ -70,12 +72,16 @@ var _sword_cell: Vector2i = Vector2i.ZERO
 var _shield_cell: Vector2i = Vector2i.ZERO
 var _potion_cell: Vector2i = Vector2i.ZERO
 var _potion2_cell: Vector2i = Vector2i.ZERO
+var _rune1_cell: Vector2i = Vector2i.ZERO
+var _rune2_cell: Vector2i = Vector2i.ZERO
 var _codex_cell: Vector2i = Vector2i.ZERO
 var _key_collected: bool = false
 var _sword_collected: bool = false
 var _shield_collected: bool = false
 var _potion_collected: bool = false
 var _potion2_collected: bool = false
+var _rune1_collected: bool = false
+var _rune2_collected: bool = false
 var _codex_collected: bool = false
 var _grid_size: Vector2i = Vector2i.ZERO
 var _game_over: bool = false
@@ -84,6 +90,8 @@ var _goblin_nodes: Array[Node2D] = []
 var _goblin_cells: Array[Vector2i] = []
 var _goblin_alive: Array[bool] = []
 var _potion2_node: Node2D
+var _rune1_node: Node2D
+var _rune2_node: Node2D
 var _door_cell: Vector2i = Vector2i.ZERO
 var _hp_max: int = 3
 var _hp_current: int = 3
@@ -214,6 +222,23 @@ func _process(_delta: float) -> void:
 			if _goblin_alive.size() > i and _goblin_alive[i] and cp == _goblin_cells[i]:
 				_resolve_combat(i)
 				break
+	# Rune pickups: rune-1 (+1 attack) and rune-2 (+1 defense i.e., -1 goblin roll)
+	if not _rune1_collected and cp == _rune1_cell:
+		_rune1_collected = true
+		print("GOT RUNE-1 (+1 ATK)")
+		if _rune1_node:
+			_rune1_node.visible = false
+		_update_hud_icons()
+		_play_sfx(SFX_PICKUP2)
+		_blink_node(player)
+	if not _rune2_collected and cp == _rune2_cell:
+		_rune2_collected = true
+		print("GOT RUNE-2 (+1 DEF)")
+		if _rune2_node:
+			_rune2_node.visible = false
+		_update_hud_icons()
+		_play_sfx(SFX_PICKUP2)
+		_blink_node(player)
 	# Check win condition each frame after movement/collisions
 	_check_win()
 	# Restart on SPACE/ENTER when game over
@@ -396,6 +421,51 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	_codex_cell = _pick_free_interior_cell(grid_size, codex_exclude)
 	if _codex_node:
 		_codex_node.global_position = Grid.cell_to_world(_codex_cell)
+	# Place runes (only on level 2+, if not already collected)
+	if _level >= 2:
+		var base_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
+		base_exclude.append(_potion2_cell)
+		if not _rune1_collected:
+			_rune1_cell = _pick_free_interior_cell(grid_size, base_exclude)
+			base_exclude.append(_rune1_cell)
+			if _rune1_node == null:
+				_rune1_node = Node2D.new()
+				_rune1_node.name = "Rune1"
+				var s := Sprite2D.new()
+				s.centered = false
+				s.texture = _try_load_tex("res://assets/rune-1.png")
+				s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				s.z_index = 1
+				_rune1_node.add_child(s)
+				add_child(_rune1_node)
+			_rune1_node.global_position = Grid.cell_to_world(_rune1_cell)
+			_rune1_node.visible = true
+		else:
+			if _rune1_node:
+				_rune1_node.visible = false
+		if not _rune2_collected:
+			_rune2_cell = _pick_free_interior_cell(grid_size, base_exclude)
+			if _rune2_node == null:
+				_rune2_node = Node2D.new()
+				_rune2_node.name = "Rune2"
+				var s2 := Sprite2D.new()
+				s2.centered = false
+				s2.texture = _try_load_tex("res://assets/rune-2.png")
+				s2.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				s2.z_index = 1
+				_rune2_node.add_child(s2)
+				add_child(_rune2_node)
+			_rune2_node.global_position = Grid.cell_to_world(_rune2_cell)
+			_rune2_node.visible = true
+		else:
+			if _rune2_node:
+				_rune2_node.visible = false
+	else:
+		# Hide runes entirely on level 1
+		if _rune1_node:
+			_rune1_node.visible = false
+		if _rune2_node:
+			_rune2_node.visible = false
 	# Debug placement dump
 	print("[DEBUG] L", _level, " placements:")
 	print("  key=", _key_cell, " sword=", _sword_cell, " shield=", _shield_cell)
@@ -444,6 +514,8 @@ func _restart_game() -> void:
 	_key_collected = false
 	_sword_collected = false
 	_shield_collected = false
+	_rune1_collected = false
+	_rune2_collected = false
 	_potion_collected = false
 	_potion2_collected = false
 	_codex_collected = false
@@ -508,7 +580,11 @@ func _resolve_combat(gidx: int) -> void:
 		# Apply equipment modifiers
 		if _sword_collected:
 			player_roll += 1
+		if _rune1_collected:
+			player_roll += 1
 		if _shield_collected:
+			goblin_roll -= 1
+		if _rune2_collected:
 			goblin_roll -= 1
 		print("Player rolls ", player_roll, ", Goblin rolls ", goblin_roll)
 		if player_roll == goblin_roll:
@@ -530,7 +606,11 @@ func _combat_round(gidx: int) -> void:
 	var goblin_roll: int = _rng.randi_range(1, 20)
 	if _sword_collected:
 		player_roll += 1
+	if _rune1_collected:
+		player_roll += 1
 	if _shield_collected:
+		goblin_roll -= 1
+	if _rune2_collected:
 		goblin_roll -= 1
 	print("Player rolls ", player_roll, ", Goblin rolls ", goblin_roll)
 	if player_roll == goblin_roll:
@@ -669,6 +749,10 @@ func _set_world_visible(visible: bool) -> void:
 		_door_node.visible = visible
 	if _potion_node:
 		_potion_node.visible = visible and not _potion_collected
+	if _rune1_node:
+		_rune1_node.visible = visible and _level >= 2 and not _rune1_collected
+	if _rune2_node:
+		_rune2_node.visible = visible and _level >= 2 and not _rune2_collected
 	_update_hud_icons()
 
 func _ensure_fov_overlay() -> void:
@@ -961,6 +1045,10 @@ func _update_hud_icons() -> void:
 		_hud_icon_shield.visible = show and _shield_collected
 	if _hud_icon_codex:
 		_hud_icon_codex.visible = show and ((_level == 1 and _codex_collected) or (_level >= 2 and _crown_collected))
+	if _hud_icon_rune1:
+		_hud_icon_rune1.visible = show and _rune1_collected
+	if _hud_icon_rune2:
+		_hud_icon_rune2.visible = show and _rune2_collected
 
 func _update_hud_hearts() -> void:
 	if _hud_hearts == null:
