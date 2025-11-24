@@ -76,14 +76,18 @@ var _sheet_tex_cache := {}
 @onready var walls_map: TileMap = $Walls
 @onready var player: Node2D = $Player
 @onready var _player_sprite: Sprite2D = $Player/Sprite2D
-@onready var _hud_hearts: HBoxContainer = $HUD/Hearts
-@onready var _hud_icon_key: TextureRect = $HUD/HUDKeyIcon
-@onready var _hud_icon_sword: TextureRect = $HUD/HUDSwordIcon
-@onready var _hud_icon_shield: TextureRect = $HUD/HUDShieldIcon
-@onready var _hud_icon_codex: TextureRect = $HUD/HUDCodexIcon
-@onready var _hud_icon_rune1: TextureRect = $HUD/HUDRune1Icon
-@onready var _hud_icon_rune2: TextureRect = $HUD/HUDRune2Icon
-@onready var _hud_icon_torch: TextureRect = $HUD/HUDTorchIcon
+@onready var _hud_hearts: HBoxContainer = $HUD/HUDBar/Hearts
+@onready var _hud_items: HBoxContainer = $HUD/HUDBar/HUDItems
+@onready var _hud_icon_key1: TextureRect = $HUD/HUDBar/HUDItems/HUDKey1Icon
+@onready var _hud_icon_key2: TextureRect = $HUD/HUDBar/HUDItems/HUDKey2Icon
+@onready var _hud_icon_sword: TextureRect = $HUD/HUDBar/HUDItems/HUDSwordIcon
+@onready var _hud_icon_shield: TextureRect = $HUD/HUDBar/HUDItems/HUDShieldIcon
+@onready var _hud_icon_codex: TextureRect = $HUD/HUDBar/HUDItems/HUDCodexIcon
+@onready var _hud_icon_crown: TextureRect = $HUD/HUDBar/HUDItems/HUDCrownIcon
+@onready var _hud_icon_rune1: TextureRect = $HUD/HUDBar/HUDItems/HUDRune1Icon
+@onready var _hud_icon_rune2: TextureRect = $HUD/HUDBar/HUDItems/HUDRune2Icon
+@onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDTorchIcon
+@onready var _hud_score: Label = $HUD/HUDBar/HUDScore
 @onready var _fade: ColorRect = $HUD/Fade
 @onready var _key_node: Item = $Key
 @onready var _sword_node: Item = $Sword
@@ -101,6 +105,7 @@ var _sheet_tex_cache := {}
 @onready var _over_bg_lose: TextureRect = $GameOver/OverBGLose
 @onready var _door_node: Node2D = $Door
 @onready var _door_sprite: Sprite2D = $Door/Sprite2D
+@onready var _hud_level: Label = $HUD/HUDLevel
 @export var level_fade_out_time: float = 0.5
 @export var level_fade_in_time: float = 0.5
 @export var level_fade_alpha: float = 0.95
@@ -236,6 +241,10 @@ var _rune1_collected: bool = false
 var _rune2_collected: bool = false
 var _torch_collected: bool = false
 var _codex_collected: bool = false
+var _key1_icon_persistent: bool = false
+var _key2_icon_persistent: bool = false
+var _codex_icon_persistent: bool = false
+var _crown_icon_persistent: bool = false
 var _grid_size: Vector2i = Vector2i.ZERO
 var _game_over: bool = false
 var _won: bool = false
@@ -288,6 +297,7 @@ func _ready() -> void:
 		_update_fade_rect()
 		if get_tree().root and not get_tree().root.size_changed.is_connected(_update_fade_rect):
 			get_tree().root.size_changed.connect(_update_fade_rect)
+	_update_hud_icons()
 	print("Main scene ready 🚀")
 
 func _process(_delta: float) -> void:
@@ -315,6 +325,10 @@ func _process(_delta: float) -> void:
 	# Simple collision checks on grid
 	if not _key_collected and cp == _key_cell:
 		_key_collected = true
+		if _level == 1:
+			_key1_icon_persistent = true
+		else:
+			_key2_icon_persistent = true
 		print("GOT KEY")
 		if _key_node:
 			_key_node.collect()
@@ -364,6 +378,7 @@ func _process(_delta: float) -> void:
 	if _level == 1:
 		if not _codex_collected and cp == _codex_cell:
 			_codex_collected = true
+			_codex_icon_persistent = true
 			print("GOT CODEX")
 			if _codex_node:
 				_codex_node.collect()
@@ -376,6 +391,7 @@ func _process(_delta: float) -> void:
 	else:
 		if not _crown_collected and cp == _codex_cell:
 			_crown_collected = true
+			_crown_icon_persistent = true
 			print("GOT CROWN")
 			if _codex_node:
 				_codex_node.collect()
@@ -446,8 +462,6 @@ func _process(_delta: float) -> void:
 
 func _on_player_moved(new_cell: Vector2i) -> void:
 	# 75% chance each goblin attempts to move 1 step in a random dir
-	print("[DEBUG] moved=", new_cell, " potion1=", _potion_cell, " p1col=", _potion_collected, 
-		" potion2=", _potion2_cell, " p2col=", _potion2_collected)
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	for goblin: Goblin in _goblins:
 		if goblin.alive and _rng.randf() <= 0.75:
@@ -780,6 +794,10 @@ func _restart_game() -> void:
 	_codex_collected = false
 	_crown_collected = false
 	_codex_collected = false
+	_key1_icon_persistent = false
+	_key2_icon_persistent = false
+	_codex_icon_persistent = false
+	_crown_icon_persistent = false
 	_score = 0
 	_door_is_open = false
 	_hp_current = _hp_max
@@ -845,6 +863,14 @@ func _fade_to(alpha: float, duration: float) -> void:
 	var tw := get_tree().create_tween()
 	tw.tween_property(_fade, "modulate:a", alpha, duration)
 	await tw.finished
+
+func _set_icon_visible(icon: TextureRect, should_show: bool) -> void:
+	if icon == null:
+		return
+	if should_show and not icon.visible and _hud_items:
+		var last_idx := _hud_items.get_child_count() - 1
+		_hud_items.move_child(icon, max(0, last_idx))
+	icon.visible = should_show
 
 func _update_fade_rect() -> void:
 	if _fade == null:
@@ -968,6 +994,10 @@ func _start_game() -> void:
 	_sword_collected = false
 	_shield_collected = false
 	_torch_collected = false
+	_key1_icon_persistent = false
+	_key2_icon_persistent = false
+	_codex_icon_persistent = false
+	_crown_icon_persistent = false
 	_hp_current = _hp_max
 	_torch_target_level = _rng.randi_range(1, 2)
 	_score = 0
@@ -1049,17 +1079,9 @@ func _set_world_visible(visible: bool) -> void:
 		t.visible = visible
 	for mouse in _mice:
 		mouse.visible = visible and mouse.alive
-	if _hud_hearts:
-		_hud_hearts.visible = visible
 	_decor.visible = visible
 	if _door_node:
 		_door_node.visible = visible
-	if _potion_node:
-		_potion_node.visible = visible and not _potion_collected
-	if _rune1_node:
-		_rune1_node.visible = visible and _level >= 2 and not _rune1_collected
-	if _rune2_node:
-		_rune2_node.visible = visible and _level >= 2 and not _rune2_collected
 	_update_hud_icons()
 
 func _ensure_fov_overlay() -> void:
@@ -1352,10 +1374,14 @@ func _load_next_level() -> void:
 	_level += 1
 	# Reset level-specific flags
 	_key_collected = false
+	if _level == 2:
+		_key1_icon_persistent = true
 	_potion_collected = false
 	_potion2_collected = false
 	_codex_collected = false
 	_crown_collected = false
+	if _level == 2:
+		_codex_icon_persistent = true
 	_door_is_open = false
 	# Clear and rebuild world
 	_clear_enemies()
@@ -1417,24 +1443,23 @@ func _update_player_sprite_appearance() -> void:
 func _update_hud_icons() -> void:
 	# Icons appear only during gameplay and when items collected
 	var show := (_state == STATE_PLAYING)
-	if _hud_icon_key:
-		_hud_icon_key.visible = show and _key_collected
-	if _hud_icon_sword:
-		_hud_icon_sword.visible = show and _sword_collected
-	if _hud_icon_shield:
-		_hud_icon_shield.visible = show and _shield_collected
-	if _hud_icon_codex:
-		_hud_icon_codex.visible = show and ((_level == 1 and _codex_collected) or (_level >= 2 and _crown_collected))
-	if _hud_icon_rune1:
-		_hud_icon_rune1.visible = show and _rune1_collected
-	if _hud_icon_rune2:
-		_hud_icon_rune2.visible = show and _rune2_collected
-	if _hud_icon_torch:
-		_hud_icon_torch.visible = show and _torch_collected
-	var score_label := get_node_or_null("HUD/HUDScore") as Label
-	if score_label:
-		score_label.visible = show
-		score_label.text = "Score: %d" % _score
+	if _hud_level:
+		_hud_level.visible = show
+		_hud_level.text = "Level: %d" % _level
+	if _hud_hearts:
+		_hud_hearts.visible = show
+	_set_icon_visible(_hud_icon_key1, show and (_key_collected and _level == 1 or _key1_icon_persistent))
+	_set_icon_visible(_hud_icon_key2, show and (_key_collected and _level >= 2 or _key2_icon_persistent))
+	_set_icon_visible(_hud_icon_sword, show and _sword_collected)
+	_set_icon_visible(_hud_icon_shield, show and _shield_collected)
+	_set_icon_visible(_hud_icon_codex, show and (_codex_collected or _codex_icon_persistent))
+	_set_icon_visible(_hud_icon_crown, show and (_crown_collected or _crown_icon_persistent))
+	_set_icon_visible(_hud_icon_rune1, show and _rune1_collected)
+	_set_icon_visible(_hud_icon_rune2, show and _rune2_collected)
+	_set_icon_visible(_hud_icon_torch, show and _torch_collected)
+	if _hud_score:
+		_hud_score.visible = show
+		_hud_score.text = "Score: %d" % _score
 
 func _apply_trap_damage() -> void:
 	if _game_over:
@@ -1466,7 +1491,9 @@ func _update_hud_hearts() -> void:
 		var tr := TextureRect.new()
 		tr.texture = HEART_TEX
 		tr.custom_minimum_size = Vector2(24, 24)
-		tr.stretch_mode = TextureRect.STRETCH_KEEP
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_hud_hearts.add_child(tr)
 
 func _blink_node(ci: CanvasItem) -> void:
@@ -1508,10 +1535,14 @@ func _set_level_item_textures() -> void:
 	if _potion2_node and _potion2_node.get_node_or_null("Sprite2D") is Sprite2D:
 		(_potion2_node.get_node("Sprite2D") as Sprite2D).z_index = 1
 	# HUD icons match the same textures
-	if _hud_icon_key:
-		_hud_icon_key.texture = key_tex if key_tex != null else _hud_icon_key.texture
-	if _hud_icon_codex:
-		_hud_icon_codex.texture = special_tex if special_tex != null else _hud_icon_codex.texture
+	if _hud_icon_key1 and KEY_TEX_1:
+		_hud_icon_key1.texture = KEY_TEX_1
+	if _hud_icon_key2 and KEY_TEX_2:
+		_hud_icon_key2.texture = KEY_TEX_2
+	if _hud_icon_codex and CODEX_TEX:
+		_hud_icon_codex.texture = CODEX_TEX
+	if _hud_icon_crown and CROWN_TEX:
+		_hud_icon_crown.texture = CROWN_TEX
 	if _hud_icon_sword and SWORD_TEX:
 		_hud_icon_sword.texture = SWORD_TEX
 	if _hud_icon_shield and SHIELD_TEX:
