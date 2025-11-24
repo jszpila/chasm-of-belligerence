@@ -6,11 +6,13 @@ const Goblin := preload("res://scripts/Goblin.gd")
 const Zombie := preload("res://scripts/Zombie.gd")
 const Minotaur := preload("res://scripts/Minotaur.gd")
 const Mouse := preload("res://scripts/Mouse.gd")
+const Skeleton := preload("res://scripts/Skeleton.gd")
 const Trap := preload("res://scripts/Trap.gd")
 const Item := preload("res://scripts/Item.gd")
 const GOBLIN_SCENE: PackedScene = preload("res://scenes/Goblin.tscn")
 const ZOMBIE_SCENE: PackedScene = preload("res://scenes/Zombie.tscn")
 const MINOTAUR_SCENE: PackedScene = preload("res://scenes/Minotaur.tscn")
+const SKELETON_SCENE: PackedScene = preload("res://scenes/Skeleton.tscn")
 const MOUSE_SCENE: PackedScene = preload("res://scenes/Mouse.tscn")
 const TRAP_SCENE: PackedScene = preload("res://scenes/Trap.tscn")
 const SPRITESHEET_PATH := "res://assets/spritesheet.png"
@@ -31,6 +33,7 @@ const SFX_PICKUP2: AudioStream = preload("res://assets/pickup-2.wav")
 const SFX_HURT1: AudioStream = preload("res://assets/hurt-1.wav")
 const SFX_HURT2: AudioStream = preload("res://assets/hurt-2.wav")
 const SFX_HURT3: AudioStream = preload("res://assets/hurt-3.wav")
+const SFX_MR_BONES: AudioStream = preload("res://assets/mr-bones.wav")
 const SFX_DOOR_OPEN: AudioStream = preload("res://assets/door-open.wav")
 const SFX_START: AudioStream = preload("res://assets/start.wav")
 const SIGHT_INNER_TILES := 5
@@ -51,6 +54,8 @@ var ZOMBIE_TEX_1: Texture2D
 var ZOMBIE_TEX_2: Texture2D
 var MINO_TEX_1: Texture2D
 var MINO_TEX_2: Texture2D
+var SKELETON_TEX_1: Texture2D
+var SKELETON_TEX_2: Texture2D
 var DOOR_TEX_1: Texture2D
 var DOOR_TEX_2: Texture2D
 var DOOR_TEX_3: Texture2D
@@ -166,6 +171,8 @@ func _load_spritesheet_textures() -> void:
 	ZOMBIE_TEX_2 = _sheet_tex(&"zombie2", Vector2i(2613, 117), true)
 	MINO_TEX_1 = _sheet_tex(&"mino1", Vector2i(1352, 208), true)
 	MINO_TEX_2 = _sheet_tex(&"mino2", Vector2i(2613, 208), true)
+	SKELETON_TEX_1 = _sheet_tex(&"skeleton1", Vector2i(1352, 130), true)
+	SKELETON_TEX_2 = _sheet_tex(&"skeleton_dead", Vector2i(2613, 130), true)
 	var mouse_tex := _sheet_tex(&"mouse", Vector2i(39, 182), true)
 	DOOR_TEX_1 = _sheet_tex(&"door1", Vector2i(156, 13), false)
 	DOOR_TEX_2 = _sheet_tex(&"door2", Vector2i(143, 13), false)
@@ -252,6 +259,7 @@ var _score: int = 0
 var _goblins: Array[Goblin] = []
 var _zombies: Array[Zombie] = []
 var _minotaurs: Array[Minotaur] = []
+var _skeletons: Array[Skeleton] = []
 var _mice: Array[Mouse] = []
 var _traps: Array[Trap] = []
 var _potion2_node: Item
@@ -267,6 +275,7 @@ var _crown_collected: bool = false
 var _is_transitioning: bool = false
 var _torch_target_level: int = 1
 var _last_trap_cell: Vector2i = Vector2i(-1, -1)
+var _bone_cells := {}
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -314,6 +323,7 @@ func _process(_delta: float) -> void:
 	# FOV overlay updates only when player moves or world changes
 	var wp := Vector2i(round(player.global_position.x), round(player.global_position.y))
 	var cp := Grid.world_to_cell(player.global_position)
+	_maybe_spawn_skeleton_from_bones(cp)
 	if _game_over:
 		# Game over state; show overlay and wait for Enter to restart
 		if _state != STATE_GAME_OVER:
@@ -352,7 +362,6 @@ func _process(_delta: float) -> void:
 		var consumed := false
 		if cp == _potion_cell and not _potion_collected:
 			if _hp_current < _hp_max:
-				print("[DEBUG] On potion1 cell. hp=", _hp_current, "/", _hp_max)
 				_potion_collected = true
 				if _potion_node:
 					_potion_node.collect()
@@ -361,7 +370,6 @@ func _process(_delta: float) -> void:
 				print("[DEBUG] On potion1 but at max HP; not consuming")
 		elif _level >= 2 and cp == _potion2_cell and not _potion2_collected:
 			if _hp_current < _hp_max:
-				print("[DEBUG] On potion2 cell. hp=", _hp_current, "/", _hp_max)
 				_potion2_collected = true
 				if _potion2_node:
 					_potion2_node.collect()
@@ -475,6 +483,9 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 	for zombie: Zombie in _zombies:
 		if zombie.alive:
 			_move_homing_enemy(zombie)
+	for skeleton: Skeleton in _skeletons:
+		if skeleton.alive:
+			_move_homing_enemy(skeleton)
 	# Move minotaur (zero on L1, one on L2) with higher accuracy towards player
 	for mino: Minotaur in _minotaurs:
 		if mino.alive:
@@ -547,10 +558,10 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 		cand.append(Vector2i(1 if delta.x > 0 else -1, 0))
 	if delta.y != 0:
 		cand.append(Vector2i(0, 1 if delta.y > 0 else -1))
-	# Accuracy: minotaur more accurate; zombie less, and decreases with distance
+	# Accuracy: minotaur more accurate; zombie/skeleton less, and decreases with distance
 	var p_towards := 0.7
-	if enemy.enemy_type == &"zombie":
-		# Make zombies track more aggressively, but still below minotaur accuracy
+	if enemy.enemy_type == &"zombie" or enemy.enemy_type == &"skeleton":
+		# Make zombies/skeletons track more aggressively, but still below minotaur accuracy
 		p_towards = clamp(0.88 - 0.035 * float(dist), 0.35, 0.9)
 	else:
 		p_towards = clamp(0.95 - 0.02 * float(dist), 0.5, 0.95)
@@ -770,7 +781,19 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	for i in range(traps_total):
 		var tcell := _level_builder.pick_free_interior_cell(
 			grid_size,
-			[player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell, zcell],
+			[
+				player_cell,
+				_key_cell,
+				_sword_cell,
+				_shield_cell,
+				_potion_cell,
+				_potion2_cell,
+				_codex_cell,
+				_rune1_cell,
+				_rune2_cell,
+				_torch_cell,
+				zcell
+			],
 			is_free,
 			has_free_neighbor
 		)
@@ -1075,6 +1098,8 @@ func _set_world_visible(visible: bool) -> void:
 		z.visible = visible and z.alive
 	for m in _minotaurs:
 		m.visible = visible and m.alive
+	for sk in _skeletons:
+		sk.visible = visible and sk.alive
 	for t in _traps:
 		t.visible = visible
 	for mouse in _mice:
@@ -1208,6 +1233,12 @@ func _spawn_trap_at(cell: Vector2i) -> void:
 	add_child(node)
 	_traps.append(node)
 
+func _spawn_skeleton_at(cell: Vector2i) -> void:
+	var node: Skeleton = SKELETON_SCENE.instantiate() as Skeleton
+	node.setup(cell, SKELETON_TEX_1, SKELETON_TEX_2)
+	add_child(node)
+	_skeletons.append(node)
+
 func _clear_enemies() -> void:
 	for child: Goblin in _goblins:
 		child.queue_free()
@@ -1215,9 +1246,12 @@ func _clear_enemies() -> void:
 		child.queue_free()
 	for child: Minotaur in _minotaurs:
 		child.queue_free()
+	for child: Skeleton in _skeletons:
+		child.queue_free()
 	_goblins.clear()
 	_zombies.clear()
 	_minotaurs.clear()
+	_skeletons.clear()
 	_clear_mice()
 	_clear_traps()
 
@@ -1264,6 +1298,7 @@ func _reset_items_visibility() -> void:
 func _clear_bones() -> void:
 	for child in _decor.get_children():
 		child.queue_free()
+	_bone_cells.clear()
 
 func _place_bones(grid_size: Vector2i) -> void:
 	var count := _rng.randi_range(5, 30)
@@ -1294,8 +1329,33 @@ func _place_bones(grid_size: Vector2i) -> void:
 			s.flip_h = (_rng.randi_range(0, 1) == 1)
 			s.global_position = Grid.cell_to_world(c)
 			_decor.add_child(s)
+			_bone_cells[c] = s
 			used[key] = true
 			break
+
+func _maybe_spawn_skeleton_from_bones(cell: Vector2i) -> void:
+	if _level <= 1:
+		return
+	if not _bone_cells.has(cell):
+		return
+	# 15% chance to summon a skeleton; leave bones intact if none spawn
+	if _rng.randf() > 0.15:
+		return
+	var bone_sprite := _bone_cells[cell] as Sprite2D
+	_bone_cells.erase(cell)
+	if bone_sprite:
+		bone_sprite.queue_free()
+	var dirs: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+	var options: Array[Vector2i] = []
+	for d in dirs:
+		var target := cell + d
+		if _can_enemy_step(target, null):
+			options.append(target)
+	if options.is_empty():
+		return
+	var spawn_cell := options[_rng.randi_range(0, options.size() - 1)]
+	_play_sfx(SFX_MR_BONES)
+	_spawn_skeleton_at(spawn_cell)
 
 func _place_entrance_marker(start_cell: Vector2i) -> void:
 	# Find a wall adjacent to the start cell and place a decorative door sprite there.
@@ -1578,7 +1638,13 @@ func _in_interior(cell: Vector2i) -> bool:
 	return cell.x >= 1 and cell.y >= 1 and cell.x < _grid_size.x - 1 and cell.y < _grid_size.y - 1
 
 func _is_free(cell: Vector2i) -> bool:
-	return _in_interior(cell) and not _is_wall(cell) and _get_enemy_at(cell) == null
+	if not _in_interior(cell) or _is_wall(cell):
+		return false
+	if _get_enemy_at(cell) != null:
+		return false
+	if _trap_at(cell) != null:
+		return false
+	return true
 
 func _can_enemy_step(cell: Vector2i, mover: Enemy) -> bool:
 	if not _in_interior(cell) or _is_wall(cell):
@@ -1666,6 +1732,9 @@ func _get_enemy_at(cell: Vector2i) -> Enemy:
 	for m: Minotaur in _minotaurs:
 		if m.alive and m.grid_cell == cell:
 			return m
+	for sk: Skeleton in _skeletons:
+		if sk.alive and sk.grid_cell == cell:
+			return sk
 	return null
 
 func _mouse_at(cell: Vector2i) -> Mouse:

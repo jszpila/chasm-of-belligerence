@@ -62,7 +62,6 @@ color = Color(0, 0, 0, 0.5)
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 12.0
-offset_top = 0.0
 offset_right = -12.0
 offset_bottom = 64.0
 grow_horizontal = 2
@@ -91,8 +90,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("5")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="HUDKey2Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
@@ -100,8 +99,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("5")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="HUDSwordIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
@@ -109,8 +108,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("10")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="HUDShieldIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
@@ -118,8 +117,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("11")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="HUDCodexIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
@@ -127,8 +126,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("13")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="HUDCrownIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
@@ -136,8 +135,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("13")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="HUDRune1Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
@@ -145,8 +144,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("14")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="HUDRune2Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
@@ -154,8 +153,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("15")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="HUDTorchIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
 visible = false
@@ -163,8 +162,8 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("16")
-stretch_mode = 5
 expand_mode = 1
+stretch_mode = 5
 
 [node name="SpacerLevel" type="Control" parent="HUD/HUDBar"]
 custom_minimum_size = Vector2(32, 1)
@@ -174,11 +173,10 @@ size_flags_vertical = 4
 [node name="HUDLevel" type="Label" parent="HUD/HUDBar"]
 custom_minimum_size = Vector2(180, 48)
 layout_mode = 2
-size_flags_vertical = 4
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 24
-vertical_alignment = 1
 text = "Level: 1"
+vertical_alignment = 1
 
 [node name="SpacerScore" type="Control" parent="HUD/HUDBar"]
 custom_minimum_size = Vector2(32, 1)
@@ -188,11 +186,10 @@ size_flags_vertical = 4
 [node name="HUDScore" type="Label" parent="HUD/HUDBar"]
 custom_minimum_size = Vector2(220, 48)
 layout_mode = 2
-size_flags_vertical = 4
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 24
-vertical_alignment = 1
 text = "Score: 0"
+vertical_alignment = 1
 
 [node name="Fade" type="ColorRect" parent="HUD"]
 z_index = 100
