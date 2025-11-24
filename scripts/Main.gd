@@ -323,7 +323,6 @@ func _process(_delta: float) -> void:
 	# FOV overlay updates only when player moves or world changes
 	var wp := Vector2i(round(player.global_position.x), round(player.global_position.y))
 	var cp := Grid.world_to_cell(player.global_position)
-	_maybe_spawn_skeleton_from_bones(cp)
 	if _game_over:
 		# Game over state; show overlay and wait for Enter to restart
 		if _state != STATE_GAME_OVER:
@@ -342,9 +341,8 @@ func _process(_delta: float) -> void:
 		print("GOT KEY")
 		if _key_node:
 			_key_node.collect()
-		_score += 1
+		_add_score(1)
 		_update_door_texture()
-		_update_hud_icons()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_check_win()
@@ -353,9 +351,8 @@ func _process(_delta: float) -> void:
 		print("GOT SWORD")
 		if _sword_node:
 			_sword_node.collect()
-			_score += 1
+			_add_score(1)
 			_update_player_sprite_appearance()
-			_update_hud_icons()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
 	# Potions (supports two on level 2+); only pick up if below max HP
@@ -390,8 +387,7 @@ func _process(_delta: float) -> void:
 			print("GOT CODEX")
 			if _codex_node:
 				_codex_node.collect()
-			_score += 1
-			_update_hud_icons()
+			_add_score(1)
 			_update_door_texture()
 			_play_sfx(SFX_PICKUP2)
 			_blink_node(player)
@@ -403,8 +399,7 @@ func _process(_delta: float) -> void:
 			print("GOT CROWN")
 			if _codex_node:
 				_codex_node.collect()
-			_score += 1
-			_update_hud_icons()
+			_add_score(1)
 			_update_door_texture()
 			_play_sfx(SFX_PICKUP2)
 			_blink_node(player)
@@ -413,9 +408,8 @@ func _process(_delta: float) -> void:
 		print("GOT SHIELD")
 		if _shield_node:
 			_shield_node.collect()
-			_score += 1
+			_add_score(1)
 			_update_player_sprite_appearance()
-			_update_hud_icons()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
 	# Torch pickup: extends FOV by +4 for the rest of the run
@@ -424,11 +418,10 @@ func _process(_delta: float) -> void:
 		print("GOT TORCH (+4 SIGHT)")
 		if _torch_node:
 			_torch_node.collect()
-		_update_hud_icons()
 		_update_fov()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
-		_score += 1
+		_add_score(1)
 
 	if not _game_over:
 		var enemy: Enemy = _get_enemy_at(cp)
@@ -449,19 +442,17 @@ func _process(_delta: float) -> void:
 		print("GOT RUNE-1 (+1 ATK)")
 		if _rune1_node:
 			_rune1_node.collect()
-		_update_hud_icons()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
-		_score += 1
+		_add_score(1)
 	if not _rune2_collected and cp == _rune2_cell:
 		_rune2_collected = true
 		print("GOT RUNE-2 (+1 DEF)")
 		if _rune2_node:
 			_rune2_node.collect()
-		_update_hud_icons()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
-		_score += 1
+		_add_score(1)
 	# Check win condition each frame after movement/collisions
 	_check_win()
 	# Restart on SPACE/ENTER when game over
@@ -469,6 +460,7 @@ func _process(_delta: float) -> void:
 		_restart_game()
 
 func _on_player_moved(new_cell: Vector2i) -> void:
+	_maybe_spawn_skeleton_from_bones(new_cell)
 	# 75% chance each goblin attempts to move 1 step in a random dir
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	for goblin: Goblin in _goblins:
@@ -908,6 +900,8 @@ func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 	var trap := _trap_at(enemy.grid_cell)
 	if trap != null:
 		_handle_enemy_hit_by_trap(enemy)
+		if not enemy.alive:
+			return
 	while true:
 		var player_roll: int = _rng.randi_range(1, 20)
 		var enemy_roll: int = _rng.randi_range(1, 20)
@@ -941,7 +935,18 @@ func _handle_enemy_death(enemy: Enemy) -> void:
 	enemy.visible = false
 	_leave_enemy_corpse(enemy)
 	_play_sfx(SFX_HURT3)
-	_score += 1
+	_add_score(_enemy_score_value(enemy))
+
+func _enemy_score_value(enemy: Enemy) -> int:
+	if enemy == null:
+		return 0
+	if enemy.enemy_type == &"minotaur":
+		return 2
+	return 1
+
+func _add_score(amount: int) -> void:
+	_score += amount
+	_update_hud_icons()
 
 func _leave_enemy_corpse(enemy: Enemy) -> void:
 	if _decor == null or enemy == null:
