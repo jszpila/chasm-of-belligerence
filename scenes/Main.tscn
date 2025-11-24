@@ -15,7 +15,7 @@
 [ext_resource type="Texture2D" uid="uid://b0g7h3ud5uan4" path="res://assets/rune-1.png" id="14"]
 [ext_resource type="Texture2D" uid="uid://d2misqo66cl05" path="res://assets/rune-2.png" id="15"]
 [ext_resource type="Texture2D" uid="uid://bwwml4mqltpf3" path="res://assets/torch.png" id="16"]
-[ext_resource type="Script" path="res://scripts/Item.gd" id="17"]
+[ext_resource type="Script" uid="uid://by1ivrwoxrbkv" path="res://scripts/Item.gd" id="17"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
@@ -51,21 +51,17 @@ script = ExtResource("4")
 [node name="HUD" type="CanvasLayer" parent="."]
 
 [node name="HUDBG" type="ColorRect" parent="HUD"]
-color = Color(0, 0, 0, 0.5)
-offset_left = 0.0
-offset_top = 0.0
+z_index = -1
 offset_right = 200.0
 offset_bottom = 56.0
-grow_horizontal = 1
-grow_vertical = 1
-z_index = -1
+color = Color(0, 0, 0, 0.5)
 
 [node name="HUDScore" type="Label" parent="HUD"]
 offset_left = 112.0
 offset_top = 12.0
-text = "Score: 0"
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 16
+text = "Score: 0"
 
 [node name="Hearts" type="HBoxContainer" parent="HUD"]
 offset_left = 16.0

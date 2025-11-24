@@ -101,6 +101,9 @@ var _sheet_tex_cache := {}
 @onready var _over_bg_lose: TextureRect = $GameOver/OverBGLose
 @onready var _door_node: Node2D = $Door
 @onready var _door_sprite: Sprite2D = $Door/Sprite2D
+@export var level_fade_out_time: float = 0.5
+@export var level_fade_in_time: float = 0.5
+@export var level_fade_alpha: float = 0.95
 var _tileset: TileSet
 var _fov_overlay: Node2D
 var _fov_visible: Array[bool] = []
@@ -274,6 +277,17 @@ func _ready() -> void:
 	# Disable player controls until game starts
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(false)
+	if _fade:
+		# Use opaque black color; modulate controls the visible alpha
+		_fade.color = Color(0, 0, 0, 1)
+		_fade.modulate.a = 0.0
+		_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_fade.show_behind_parent = false
+		_fade.z_as_relative = false
+		_fade.z_index = 1000
+		_update_fade_rect()
+		if get_tree().root and not get_tree().root.size_changed.is_connected(_update_fade_rect):
+			get_tree().root.size_changed.connect(_update_fade_rect)
 	print("Main scene ready 🚀")
 
 func _process(_delta: float) -> void:
@@ -522,7 +536,8 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 	# Accuracy: minotaur more accurate; zombie less, and decreases with distance
 	var p_towards := 0.7
 	if enemy.enemy_type == &"zombie":
-		p_towards = clamp(0.8 - 0.05 * float(dist), 0.2, 0.8)
+		# Make zombies track more aggressively, but still below minotaur accuracy
+		p_towards = clamp(0.88 - 0.035 * float(dist), 0.35, 0.9)
 	else:
 		p_towards = clamp(0.95 - 0.02 * float(dist), 0.5, 0.95)
 	var dir := Vector2i.ZERO
@@ -752,9 +767,7 @@ func _restart_game() -> void:
 	if _is_transitioning:
 		return
 	_is_transitioning = true
-	var tw1 := get_tree().create_tween()
-	tw1.tween_property(_fade, "modulate:a", 1.0, 0.4)
-	await tw1.finished
+	await _fade_to(level_fade_alpha, level_fade_out_time)
 	# Reset flags
 	_game_over = false
 	_key_collected = false
@@ -767,6 +780,8 @@ func _restart_game() -> void:
 	_codex_collected = false
 	_crown_collected = false
 	_codex_collected = false
+	_score = 0
+	_door_is_open = false
 	_hp_current = _hp_max
 	_level = 1
 	_torch_collected = false
@@ -820,10 +835,22 @@ func _restart_game() -> void:
 	_set_world_visible(true)
 	_play_sfx(SFX_START)
 	# Fade back in
-	var tw2 := get_tree().create_tween()
-	tw2.tween_property(_fade, "modulate:a", 0.0, 0.4)
-	await tw2.finished
+	await _fade_to(0.0, level_fade_in_time)
 	_is_transitioning = false
+
+func _fade_to(alpha: float, duration: float) -> void:
+	if _fade == null:
+		return
+	_fade.visible = true
+	var tw := get_tree().create_tween()
+	tw.tween_property(_fade, "modulate:a", alpha, duration)
+	await tw.finished
+
+func _update_fade_rect() -> void:
+	if _fade == null:
+		return
+	_fade.position = Vector2.ZERO
+	_fade.size = get_viewport_rect().size
 
 func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 	if _game_over or enemy == null or not enemy.alive:
@@ -1321,9 +1348,7 @@ func _load_next_level() -> void:
 	_is_transitioning = true
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(false)
-	var tw := get_tree().create_tween()
-	tw.tween_property(_fade, "modulate:a", 1.0, 0.3)
-	await tw.finished
+	await _fade_to(level_fade_alpha, level_fade_out_time)
 	_level += 1
 	# Reset level-specific flags
 	_key_collected = false
@@ -1371,9 +1396,7 @@ func _load_next_level() -> void:
 	_update_hud_hearts()
 	_update_fov()
 	_set_world_visible(true)
-	var tw2 := get_tree().create_tween()
-	tw2.tween_property(_fade, "modulate:a", 0.0, 0.3)
-	await tw2.finished
+	await _fade_to(0.0, level_fade_in_time)
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(true)
 	_is_transitioning = false
@@ -1501,8 +1524,11 @@ func _set_level_item_textures() -> void:
 		_hud_icon_torch.texture = TORCH_TEX
 
 func is_passable(cell: Vector2i) -> bool:
-	# Allow stepping onto the door cell so the player can win
-	return cell == _door_cell
+	# Allow stepping onto the door cell only when it is actually open
+	return _door_is_open and cell == _door_cell
+
+func is_in_bounds(cell: Vector2i) -> bool:
+	return _in_bounds(cell)
 
 func _place_random_inner_walls(grid_size: Vector2i) -> void:
 	var player_cell := Grid.world_to_cell(player.global_position)

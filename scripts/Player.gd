@@ -70,8 +70,12 @@ func _try_move(delta_cell: Vector2i) -> void:
 	_end_turn()
 
 func _is_blocked(cell: Vector2i) -> bool:
-	# Allow parent scene to override passability (e.g., door tile)
 	var parent := get_parent()
+	# Prevent leaving the playable grid
+	if parent and parent.has_method("is_in_bounds"):
+		if not parent.is_in_bounds(cell):
+			return true
+	# Allow parent scene to override passability (e.g., door tile)
 	if parent and parent.has_method("is_passable"):
 		if parent.is_passable(cell):
 			return false
