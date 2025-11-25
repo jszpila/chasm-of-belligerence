@@ -72,8 +72,21 @@ offset_bottom = 64.0
 grow_horizontal = 2
 theme_override_constants/separation = 10
 
-[node name="Hearts" type="HBoxContainer" parent="HUD/HUDBar"]
-custom_minimum_size = Vector2(160, 48)
+[node name="HUDVitals" type="VBoxContainer" parent="HUD/HUDBar"]
+custom_minimum_size = Vector2(160, 64)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = 0
+
+[node name="Hearts" type="HBoxContainer" parent="HUD/HUDBar/HUDVitals"]
+custom_minimum_size = Vector2(160, 24)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = 6
+offset_top = -4.0
+
+[node name="Armor" type="HBoxContainer" parent="HUD/HUDBar/HUDVitals"]
+custom_minimum_size = Vector2(160, 24)
 layout_mode = 2
 size_flags_vertical = 4
 theme_override_constants/separation = 6

@@ -43,6 +43,7 @@ const FLOOR_ALPHA_MIN := 1.0
 const FLOOR_ALPHA_MAX := 1.0
 const BONE_ALPHA_MIN := 1.0
 const BONE_ALPHA_MAX := 1.0
+const ARMOR_MAX := 3
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -86,7 +87,7 @@ var _sheet_tex_cache := {}
 @onready var walls_map: TileMap = $Walls
 @onready var player: Node2D = $Player
 @onready var _player_sprite: Sprite2D = $Player/Sprite2D
-@onready var _hud_hearts: HBoxContainer = $HUD/HUDBar/Hearts
+@onready var _hud_hearts: HBoxContainer = $HUD/HUDBar/HUDVitals/Hearts
 @onready var _hud_items: HBoxContainer = $HUD/HUDBar/HUDItems
 @onready var _hud_icon_key1: TextureRect = $HUD/HUDBar/HUDItems/HUDKey1Icon
 @onready var _hud_icon_key2: TextureRect = $HUD/HUDBar/HUDItems/HUDKey2Icon
@@ -101,6 +102,7 @@ var _sheet_tex_cache := {}
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDTorchIcon
 @onready var _hud_icon_ring: TextureRect = $HUD/HUDBar/HUDItems/HUDRingIcon
 @onready var _hud_icon_potion: TextureRect = $HUD/HUDBar/HUDItems/HUDPotionIcon
+@onready var _hud_armor: HBoxContainer = $HUD/HUDBar/HUDVitals/Armor
 @onready var _hud_atk_label: Label = $HUD/HUDBar/HUDStats/HUDATKLabel
 @onready var _hud_def_label: Label = $HUD/HUDBar/HUDStats/HUDDEFLabel
 @onready var _hud_score: Label = $HUD/HUDBar/HUDScore
@@ -253,6 +255,7 @@ var _sword_cell: Vector2i = Vector2i.ZERO
 var _shield_cell: Vector2i = Vector2i.ZERO
 var _potion_cell: Vector2i = Vector2i.ZERO
 var _potion2_cell: Vector2i = Vector2i.ZERO
+var _armor_cells: Array[Vector2i] = []
 var _rune1_cells: Array[Vector2i] = []
 var _rune2_cells: Array[Vector2i] = []
 var _rune3_cells: Array[Vector2i] = []
@@ -266,6 +269,7 @@ var _sword_collected: bool = false
 var _shield_collected: bool = false
 var _potion_collected: bool = false
 var _potion2_collected: bool = false
+var _armor_current: int = 0
 var _rune1_collected_count: int = 0
 var _rune2_collected_count: int = 0
 var _rune3_collected_count: int = 0
@@ -295,6 +299,7 @@ var _skeletons: Array[Skeleton] = []
 var _mice: Array[Mouse] = []
 var _traps: Array[Trap] = []
 var _potion2_node: Item
+var _armor_nodes: Array[Item] = []
 var _rune1_nodes: Array[Item] = []
 var _rune2_nodes: Array[Item] = []
 var _rune3_nodes: Array[Item] = []
@@ -314,6 +319,7 @@ var _bone_spawn_outcomes := {}
 var _level_special_map := {} # level -> special type
 var _special_levels := {} # special type -> level
 var _level_key_map := {} # level -> key type
+var _armor_plan := {} # level -> count
 var _rune1_plan := {} # level -> count
 var _rune2_plan := {}
 var _rune3_plan := {}
@@ -524,6 +530,16 @@ func _process(_delta: float) -> void:
 				_blink_node(player)
 				_add_score(1)
 				break
+		for ar in _armor_nodes:
+			if ar != null and not ar.collected and cp == ar.grid_cell:
+				_armor_current = min(ARMOR_MAX, _armor_current + 1)
+				print("GOT ARMOR (+1 ARMOR)")
+				_update_hud_armor()
+				ar.collect()
+				_play_sfx(SFX_PICKUP2)
+				_blink_node(player)
+				_add_score(1)
+				break
 	# Check win condition each frame after movement/collisions
 	_check_win()
 	# Restart on SPACE/ENTER when game over
@@ -665,6 +681,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	_clear_enemies()
 	_clear_mice()
 	_clear_runes()
+	_clear_armor_items()
 	_clear_bones()
 	_potion_collected = false
 	_potion2_collected = false
@@ -802,9 +819,18 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		base_exclude.append(_codex_cell)
 	if special_type == &"ring" and _ring_cell != Vector2i.ZERO:
 		base_exclude.append(_ring_cell)
+	var armor_to_place: int = int(_armor_plan.get(_level, 0))
 	var rune1_to_place: int = int(_rune1_plan.get(_level, 0))
 	var rune2_to_place: int = int(_rune2_plan.get(_level, 0))
 	var rune3_to_place: int = int(_rune3_plan.get(_level, 0))
+	for i_a in range(armor_to_place):
+		var a_cell := _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
+		base_exclude.append(a_cell)
+		_armor_cells.append(a_cell)
+		var a_node := _make_item_node("Armor%d" % i_a, ARMOR_TEX)
+		add_child(a_node)
+		a_node.place(a_cell)
+		_armor_nodes.append(a_node)
 	for i_r1 in range(rune1_to_place):
 		var cell1 := _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
 		base_exclude.append(cell1)
@@ -840,6 +866,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			exclude2.append(c1)
 		for c2 in _rune2_cells:
 			exclude2.append(c2)
+		for a_cell in _armor_cells:
+			exclude2.append(a_cell)
 		for c3 in _rune3_cells:
 			exclude2.append(c3)
 		if special_type == &"ring" and _ring_cell != Vector2i.ZERO:
@@ -939,6 +967,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		]
 		t_exclude.append_array(_rune1_cells)
 		t_exclude.append_array(_rune2_cells)
+		t_exclude.append_array(_armor_cells)
 		t_exclude.append_array(_rune3_cells)
 		if not zcells.is_empty():
 			t_exclude.append(zcells[0])
@@ -962,6 +991,7 @@ func _restart_game() -> void:
 	_shield_collected = false
 	_potion_collected = false
 	_potion2_collected = false
+	_armor_current = 0
 	_codex_collected = false
 	_crown_collected = false
 	_codex_collected = false
@@ -973,6 +1003,7 @@ func _restart_game() -> void:
 	_rune1_cells.clear()
 	_rune2_cells.clear()
 	_rune3_cells.clear()
+	_armor_cells.clear()
 	_key1_icon_persistent = false
 	_key2_icon_persistent = false
 	_key3_icon_persistent = false
@@ -994,9 +1025,11 @@ func _restart_game() -> void:
 	_rune1_cells.clear()
 	_rune2_cells.clear()
 	_rune3_cells.clear()
+	_armor_cells.clear()
 	_last_trap_cell = Vector2i(-1, -1)
 	_clear_enemies()
 	_clear_runes()
+	_clear_armor_items()
 	# Clear maps
 	floor_map.clear()
 	walls_map.clear()
@@ -1038,6 +1071,7 @@ func _restart_game() -> void:
 	_update_player_sprite_appearance()
 	_update_hud_icons()
 	_update_hud_hearts()
+	_update_hud_armor()
 	# Hide game over overlay and mark state
 	_over_layer.visible = false
 	_state = STATE_PLAYING
@@ -1139,9 +1173,22 @@ func _leave_enemy_corpse(enemy: Enemy) -> void:
 	_decor.add_child(s)
 
 func _handle_player_hit() -> void:
-	_hp_current -= 1
-	print("Player loses 1 HP. HP now:", _hp_current)
-	_update_hud_hearts()
+	_apply_player_damage(1)
+
+func _apply_player_damage(amount: int) -> void:
+	if _game_over or amount <= 0:
+		return
+	var remaining := amount
+	if _armor_current > 0:
+		var absorbed: int = min(_armor_current, remaining)
+		_armor_current -= absorbed
+		remaining -= absorbed
+		_update_hud_armor()
+	if remaining > 0:
+		_hp_current = max(0, _hp_current - remaining)
+		_update_hud_hearts()
+	else:
+		_update_hud_hearts()
 	_play_sfx(SFX_HURT2)
 	_blink_node(player)
 	if _hp_current <= 0:
@@ -1335,6 +1382,7 @@ func _save_level_state(level: int) -> void:
 	state["potion_collected"] = _potion_collected
 	state["potion2_cell"] = _potion2_cell
 	state["potion2_collected"] = _potion2_collected
+	state["armor_cells"] = []
 	state["codex_cell"] = _codex_cell
 	state["codex_collected"] = _codex_collected
 	state["ring_cell"] = _ring_cell
@@ -1351,6 +1399,9 @@ func _save_level_state(level: int) -> void:
 	for r2 in _rune2_nodes:
 		if r2 != null and not r2.collected:
 			state["rune2_cells"].append(r2.grid_cell)
+	for ar in _armor_nodes:
+		if ar != null and not ar.collected:
+			state["armor_cells"].append(ar.grid_cell)
 	for r3 in _rune3_nodes:
 		if r3 != null and not r3.collected:
 			state["rune3_cells"].append(r3.grid_cell)
@@ -1447,6 +1498,7 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	_potion_collected = state.get("potion_collected", _potion_collected)
 	_potion2_cell = state.get("potion2_cell", _potion2_cell)
 	_potion2_collected = state.get("potion2_collected", _potion2_collected)
+	var armor_state: Array = state.get("armor_cells", [])
 	_codex_cell = state.get("codex_cell", _codex_cell)
 	_codex_collected = state.get("codex_collected", _codex_collected)
 	_ring_cell = state.get("ring_cell", _ring_cell)
@@ -1461,9 +1513,14 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	var r2_state: Array = state.get("rune2_cells", [])
 	var r3_state: Array = state.get("rune3_cells", [])
 	_clear_runes()
+	_clear_armor_items()
 	_rune1_cells = []
 	_rune2_cells = []
 	_rune3_cells = []
+	_armor_cells = []
+	for a in armor_state:
+		if a is Vector2i:
+			_armor_cells.append(a)
 	for v in r1_state:
 		if v is Vector2i:
 			_rune1_cells.append(v)
@@ -1478,6 +1535,11 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 		add_child(n1)
 		n1.place(rc1)
 		_rune1_nodes.append(n1)
+	for ac in _armor_cells:
+		var an := _make_item_node("ArmorRestore", ARMOR_TEX)
+		add_child(an)
+		an.place(ac)
+		_armor_nodes.append(an)
 	for rc2 in _rune2_cells:
 		var n2 := _make_item_node("Rune2Restore", RUNE2_TEX)
 		add_child(n2)
@@ -1596,6 +1658,7 @@ func _start_game() -> void:
 	_ring_collected = false
 	_codex_collected = false
 	_crown_collected = false
+	_armor_current = 0
 	_rune1_collected_count = 0
 	_rune2_collected_count = 0
 	_rune3_collected_count = 0
@@ -1615,6 +1678,7 @@ func _start_game() -> void:
 	_update_hud_icons()
 	_clear_enemies()
 	_clear_runes()
+	_clear_armor_items()
 	# Build board fresh
 	floor_map.clear()
 	walls_map.clear()
@@ -1637,6 +1701,7 @@ func _start_game() -> void:
 	_update_player_sprite_appearance()
 	_update_hud_icons()
 	_update_hud_hearts()
+	_update_hud_armor()
 	# React to player movement for goblin AI
 	if player.has_signal("moved") and not player.moved.is_connected(_on_player_moved):
 		player.moved.connect(_on_player_moved)
@@ -1685,6 +1750,9 @@ func _set_world_visible(visible: bool) -> void:
 	for r2 in _rune2_nodes:
 		if r2:
 			r2.visible = visible and not r2.collected
+	for ar in _armor_nodes:
+		if ar:
+			ar.visible = visible and not ar.collected
 	for r3 in _rune3_nodes:
 		if r3:
 			r3.visible = visible and not r3.collected
@@ -1861,6 +1929,12 @@ func _clear_traps() -> void:
 		t.queue_free()
 	_traps.clear()
 
+func _clear_armor_items() -> void:
+	for a in _armor_nodes:
+		a.queue_free()
+	_armor_nodes.clear()
+	_armor_cells.clear()
+
 func _clear_runes() -> void:
 	for r in _rune1_nodes:
 		r.queue_free()
@@ -1909,6 +1983,10 @@ func _reset_items_visibility() -> void:
 		if r2:
 			r2.collected = r2.collected
 			r2.visible = not r2.collected
+	for ar in _armor_nodes:
+		if ar:
+			ar.collected = ar.collected
+			ar.visible = not ar.collected
 	for r3 in _rune3_nodes:
 		if r3:
 			r3.collected = r3.collected
@@ -1939,7 +2017,7 @@ func _place_bones(grid_size: Vector2i) -> void:
 				continue
 			if not _is_free(c):
 				continue
-			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c):
+			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _armor_cells.has(c):
 				continue
 			if _get_enemy_at(c) != null:
 				continue
@@ -2083,6 +2161,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_door_is_open = false
 	_clear_enemies()
 	_clear_runes()
+	_clear_armor_items()
 	_clear_bones()
 	floor_map.clear()
 	walls_map.clear()
@@ -2118,6 +2197,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_update_door_texture()
 	_update_hud_icons()
 	_update_hud_hearts()
+	_update_hud_armor()
 	if _hud_level:
 		_hud_level.text = "Level: %d" % _level
 	_update_fov()
@@ -2186,6 +2266,8 @@ func _update_hud_icons() -> void:
 	if _hud_score:
 		_hud_score.visible = show
 		_hud_score.text = "Score: %d" % _score
+	if _hud_armor:
+		_hud_armor.visible = show
 
 func _pickup_potion_if_available(cell: Vector2i) -> void:
 	if _carried_potion:
@@ -2222,15 +2304,7 @@ func _try_use_potion() -> void:
 func _apply_trap_damage() -> void:
 	if _game_over:
 		return
-	_hp_current = max(0, _hp_current - 1)
-	_update_hud_hearts()
-	_play_sfx(SFX_HURT2)
-	_blink_node(player)
-	if _hp_current <= 0:
-		_game_over = true
-		_won = false
-		if player.has_method("set_control_enabled"):
-			player.set_control_enabled(false)
+	_apply_player_damage(1)
 
 func _handle_enemy_hit_by_trap(enemy: Enemy) -> void:
 	if enemy == null or not enemy.alive:
@@ -2253,6 +2327,21 @@ func _update_hud_hearts() -> void:
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_hud_hearts.add_child(tr)
+	_update_hud_armor()
+
+func _update_hud_armor() -> void:
+	if _hud_armor == null:
+		return
+	for c in _hud_armor.get_children():
+		c.queue_free()
+	for i in range(_armor_current):
+		var tr := TextureRect.new()
+		tr.texture = ARMOR_ICON_TEX
+		tr.custom_minimum_size = Vector2(24, 24)
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_hud_armor.add_child(tr)
 
 func _blink_node(ci: CanvasItem) -> void:
 	if ci == null:
@@ -2439,6 +2528,7 @@ func _prepare_run_layout() -> void:
 	_level_special_map.clear()
 	_special_levels.clear()
 	_level_key_map.clear()
+	_armor_plan.clear()
 	_rune1_plan.clear()
 	_rune2_plan.clear()
 	_rune3_plan.clear()
@@ -2463,9 +2553,13 @@ func _prepare_run_layout() -> void:
 			break
 		var kl: int = key_levels.pop_back()
 		_level_key_map[kl] = k
+	var armor_total: int = _rng.randi_range(1, 3)
 	var rune1_total: int = _rng.randi_range(1, 3)
 	var rune2_total: int = _rng.randi_range(1, 3)
 	var rune3_total: int = _rng.randi_range(1, 3)
+	for i_a in range(armor_total):
+		var al: int = _rng.randi_range(1, _max_level)
+		_armor_plan[al] = _armor_plan.get(al, 0) + 1
 	for i3 in range(rune1_total):
 		var rl: int = _rng.randi_range(1, _max_level)
 		_rune1_plan[rl] = _rune1_plan.get(rl, 0) + 1
