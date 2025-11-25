@@ -1,10 +1,11 @@
-[gd_scene load_steps=17 format=3 uid="uid://bof05ivffmn5u"]
+[gd_scene load_steps=18 format=3 uid="uid://bof05ivffmn5u"]
 
 [ext_resource type="Script" uid="uid://s5pbhuqwkwq4" path="res://scripts/Main.gd" id="1"]
 [ext_resource type="TileSet" uid="uid://tayrg5g1nh5u" path="res://tiles/Sprites.tileset.tres" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="3"]
 [ext_resource type="Script" uid="uid://chd0omw48s33h" path="res://scripts/PixelScaler.gd" id="4"]
 [ext_resource type="Texture2D" uid="uid://ojsa1cwutvr1" path="res://assets/key-1.png" id="5"]
+[ext_resource type="FontFile" uid="uid://lcsi3iekfbl5" path="res://assets/DungeonFont.ttf" id="6"]
 [ext_resource type="Texture2D" uid="uid://svvp3seutjkw" path="res://assets/codex-quest-title.png" id="7"]
 [ext_resource type="Texture2D" uid="uid://c2rxob573x2am" path="res://assets/codex-quest-win.png" id="8"]
 [ext_resource type="Texture2D" uid="uid://l3gvmh8f4b6k" path="res://assets/codex-quest-lose.png" id="9"]
@@ -240,6 +241,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 text = "Press Enter to start"
+theme_override_fonts/font = ExtResource("6")
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -273,6 +275,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 text = "Press Enter to restart"
+theme_override_fonts/font = ExtResource("6")
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -284,6 +287,7 @@ anchor_bottom = 1.0
 offset_top = -48.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_fonts/font = ExtResource("6")
 horizontal_alignment = 1
 vertical_alignment = 1
 

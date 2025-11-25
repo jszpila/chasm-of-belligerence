@@ -302,6 +302,7 @@ var _is_transitioning: bool = false
 var _torch_target_level: int = 1
 var _last_trap_cell: Vector2i = Vector2i(-1, -1)
 var _bone_cells := {}
+var _bone_spawn_outcomes := {}
 var _level_special_map := {} # level -> special type
 var _special_levels := {} # special type -> level
 var _level_key_map := {} # level -> key type
@@ -528,6 +529,7 @@ func _process(_delta: float) -> void:
 		_restart_game()
 
 func _on_player_moved(new_cell: Vector2i) -> void:
+	var skeleton_count_before := _skeletons.size()
 	_maybe_spawn_skeleton_from_bones(new_cell)
 	# 75% chance each goblin attempts to move 1 step in a random dir
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
@@ -543,7 +545,10 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 	for zombie: Zombie in _zombies:
 		if zombie.alive:
 			_move_homing_enemy(zombie)
-	for skeleton: Skeleton in _skeletons:
+	for i in range(_skeletons.size()):
+		var skeleton := _skeletons[i]
+		if i >= skeleton_count_before:
+			continue
 		if skeleton.alive:
 			_move_homing_enemy(skeleton)
 	# Move minotaur (zero on L1, one on L2) with higher accuracy towards player
@@ -1881,11 +1886,14 @@ func _clear_bones() -> void:
 	for child in _decor.get_children():
 		child.queue_free()
 	_bone_cells.clear()
+	_bone_spawn_outcomes.clear()
 
 func _place_bones(grid_size: Vector2i) -> void:
 	var count := _rng.randi_range(5, 30)
 	var used := {}
 	var player_cell := Grid.world_to_cell(player.global_position)
+	# Skeleton chance: starts at 15% and climbs 5% per level (and falls if level decreases)
+	var spawn_chance: float = clamp(0.15 + 0.05 * float(_level - 1), 0.15, 0.7)
 	for i in range(count):
 		var attempts := 0
 		while attempts < 2000:
@@ -1912,6 +1920,8 @@ func _place_bones(grid_size: Vector2i) -> void:
 			s.global_position = Grid.cell_to_world(c)
 			_decor.add_child(s)
 			_bone_cells[c] = s
+			# Lock in skeleton spawn chance now to avoid re-rolling on each step.
+			_bone_spawn_outcomes[c] = (_rng.randf() <= spawn_chance)
 			used[key] = true
 			break
 
@@ -1920,9 +1930,11 @@ func _maybe_spawn_skeleton_from_bones(cell: Vector2i) -> void:
 		return
 	if not _bone_cells.has(cell):
 		return
-	# 15% chance to summon a skeleton; leave bones intact if none spawn
-	var chance: float = clamp(0.15 + 0.03 * float(_level - 1), 0.15, 0.7)
-	if _rng.randf() > chance:
+	if not _bone_spawn_outcomes.has(cell):
+		return
+	var should_spawn: bool = _bone_spawn_outcomes[cell]
+	_bone_spawn_outcomes.erase(cell)
+	if not should_spawn:
 		return
 	var bone_sprite := _bone_cells[cell] as Sprite2D
 	_bone_cells.erase(cell)
