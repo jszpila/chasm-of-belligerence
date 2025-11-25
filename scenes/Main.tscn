@@ -252,6 +252,31 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0)
 
+[node name="HUDLineLeft" type="ColorRect" parent="HUD"]
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_right = 1.0
+offset_bottom = 64.0
+color = Color(0.4, 0.4, 0.4, 1)
+
+[node name="HUDLineRight" type="ColorRect" parent="HUD"]
+anchors_preset = 0
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -1.0
+offset_bottom = 64.0
+color = Color(0.4, 0.4, 0.4, 1)
+
+[node name="HUDLineBottom" type="ColorRect" parent="HUD"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 63.0
+offset_bottom = 64.0
+grow_horizontal = 2
+color = Color(0.4, 0.4, 0.4, 1)
+
 [node name="Title" type="CanvasLayer" parent="."]
 
 [node name="TitleBG" type="TextureRect" parent="Title"]
