@@ -95,7 +95,7 @@ body {
 }
 
 .text-content {
-	max-width: 768px;
+	max-width: 100%;
 	margin: 1rem auto 0 auto;
 	text-align: left;
 }
@@ -105,12 +105,16 @@ body {
 }
 
 .text-content h2 {
-	margin-bottom: 0.25rem;
+	margin: 0 0 0.25rem 0;
 }
 
 .text-content ul {
 	padding: 0;
 	margin: 0 0 0 1rem;
+}
+
+.text-content p {
+	margin-top: 0;
 }
 
 .flex-container {
@@ -119,7 +123,8 @@ body {
 }
 
 .flex-item{
-	flex: 1
+	flex: 1;
+	padding-right: 1rem
 }
 		</style>
 		$GODOT_HEAD_INCLUDE
@@ -131,8 +136,11 @@ body {
 			</canvas>
 			<div class="text-content">
 			<h1>CHASM OF BELLIGERENCE</h1>
-			<p>For causes known only to you, you have been thrown down a hole into the pit full of goblins, and who knows what else, known as <i><b>THE CHASM OF BELLIGERENCE</b></i>. To escape, you must find the Codex, Crown, and Ring of the Goblin Lord Mukbang, for some reason.</p>
 			<div class="flex-container">
+				<div class="flex-item">
+					<h2>The Story So Far...</h2>
+					<p>For causes known only to you, you have been thrown down a hole into a pit full of goblins and who knows what else, known as <i><b>THE CHASM OF BELLIGERENCE</b></i>. To escape, you must find the Codex, Crown, and Ring of the Goblin Lord Mukbang, for some reason.</p>
+				</div>
 				<div class="flex-item">
 					<h2>Controls</h2>
 					<ul>
