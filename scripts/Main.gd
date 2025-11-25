@@ -665,6 +665,9 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	_clear_enemies()
 	_clear_mice()
 	_clear_runes()
+	_clear_bones()
+	_potion_collected = false
+	_potion2_collected = false
 	_reset_items_visibility()
 	# Place key (may be absent on some levels)
 	var key_type := _current_key_type()
@@ -2080,6 +2083,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_door_is_open = false
 	_clear_enemies()
 	_clear_runes()
+	_clear_bones()
 	floor_map.clear()
 	walls_map.clear()
 	var grid_size := _get_grid_size()

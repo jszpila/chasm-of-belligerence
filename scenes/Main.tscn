@@ -12,10 +12,10 @@
 
 [sub_resource type="LabelSettings" id="1"]
 font = ExtResource("6")
+font_size = 84
+shadow_size = 2
 shadow_color = Color(0, 0, 0, 0.65)
 shadow_offset = Vector2(2, 2)
-shadow_size = 2
-font_size = 84
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
@@ -289,8 +289,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_fonts/font = ExtResource("6")
-label_settings = SubResource("1")
 text = "Press Enter to start"
+label_settings = SubResource("1")
 horizontal_alignment = 1
 vertical_alignment = 1
 
