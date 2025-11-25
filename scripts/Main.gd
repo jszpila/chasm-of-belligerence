@@ -61,14 +61,19 @@ var DOOR_TEX_2: Texture2D
 var DOOR_TEX_3: Texture2D
 var KEY_TEX_1: Texture2D
 var KEY_TEX_2: Texture2D
+var KEY_TEX_3: Texture2D
 var SWORD_TEX: Texture2D
 var SHIELD_TEX: Texture2D
+var ARMOR_TEX: Texture2D
 var POTION_TEX: Texture2D
 var CODEX_TEX: Texture2D
 var CROWN_TEX: Texture2D
 var RUNE1_TEX: Texture2D
 var RUNE2_TEX: Texture2D
+var RUNE3_TEX: Texture2D
 var TORCH_TEX: Texture2D
+var RING_TEX: Texture2D
+var ARMOR_ICON_TEX: Texture2D
 var TRAP_TEX_A: Texture2D
 var TRAP_TEX_B: Texture2D
 var BONE_TEXTURES: Array[Texture2D] = []
@@ -85,6 +90,7 @@ var _sheet_tex_cache := {}
 @onready var _hud_items: HBoxContainer = $HUD/HUDBar/HUDItems
 @onready var _hud_icon_key1: TextureRect = $HUD/HUDBar/HUDItems/HUDKey1Icon
 @onready var _hud_icon_key2: TextureRect = $HUD/HUDBar/HUDItems/HUDKey2Icon
+@onready var _hud_icon_key3: TextureRect = $HUD/HUDBar/HUDItems/HUDKey3Icon
 @onready var _hud_icon_sword: TextureRect = $HUD/HUDBar/HUDItems/HUDSwordIcon
 @onready var _hud_icon_shield: TextureRect = $HUD/HUDBar/HUDItems/HUDShieldIcon
 @onready var _hud_icon_codex: TextureRect = $HUD/HUDBar/HUDItems/HUDCodexIcon
@@ -92,6 +98,7 @@ var _sheet_tex_cache := {}
 @onready var _hud_icon_rune1: TextureRect = $HUD/HUDBar/HUDItems/HUDRune1Icon
 @onready var _hud_icon_rune2: TextureRect = $HUD/HUDBar/HUDItems/HUDRune2Icon
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDTorchIcon
+@onready var _hud_icon_ring: TextureRect = $HUD/HUDBar/HUDItems/HUDRingIcon
 @onready var _hud_score: Label = $HUD/HUDBar/HUDScore
 @onready var _fade: ColorRect = $HUD/Fade
 @onready var _key_node: Item = $Key
@@ -110,7 +117,9 @@ var _sheet_tex_cache := {}
 @onready var _over_bg_lose: TextureRect = $GameOver/OverBGLose
 @onready var _door_node: Node2D = $Door
 @onready var _door_sprite: Sprite2D = $Door/Sprite2D
-@onready var _hud_level: Label = $HUD/HUDLevel
+@onready var _entrance_door_node: Node2D = $EntranceDoor
+@onready var _entrance_door_sprite: Sprite2D = $EntranceDoor/Sprite2D
+@onready var _hud_level: Label = $HUD/HUDBar/HUDLevel
 @export var level_fade_out_time: float = 0.5
 @export var level_fade_in_time: float = 0.5
 @export var level_fade_alpha: float = 0.95
@@ -179,14 +188,19 @@ func _load_spritesheet_textures() -> void:
 	DOOR_TEX_3 = _sheet_tex(&"door3", Vector2i(260, 26), false)
 	KEY_TEX_1 = _sheet_tex(&"key1", Vector2i(117, 585), true)
 	KEY_TEX_2 = _sheet_tex(&"key2", Vector2i(13, 585), true)
+	KEY_TEX_3 = _sheet_tex(&"key3", Vector2i(39, 585), true)
 	SWORD_TEX = _sheet_tex(&"sword", Vector2i(351, 78), true)
 	SHIELD_TEX = _sheet_tex(&"shield", Vector2i(364, 156), true)
+	ARMOR_TEX = _sheet_tex(&"armor", Vector2i(351, 143), true)
 	POTION_TEX = _sheet_tex(&"potion", Vector2i(481, 52), true)
 	CODEX_TEX = _sheet_tex(&"codex", Vector2i(91, 481), true)
 	CROWN_TEX = _sheet_tex(&"crown", Vector2i(351, 299), true)
 	RUNE1_TEX = _sheet_tex(&"rune1", Vector2i(338, 221), true)
 	RUNE2_TEX = _sheet_tex(&"rune2", Vector2i(351, 221), true)
+	RUNE3_TEX = _sheet_tex(&"rune3", Vector2i(364, 221), true)
 	TORCH_TEX = _sheet_tex(&"torch", Vector2i(52, 546), true)
+	RING_TEX = _sheet_tex(&"ring", Vector2i(156, 559), true)
+	ARMOR_ICON_TEX = _sheet_tex(&"armor_icon", Vector2i(338, 156), true)
 	TRAP_TEX_A = _sheet_tex(&"trap_a", Vector2i(364, 273), true)
 	TRAP_TEX_B = _sheet_tex(&"trap_b", Vector2i(390, 273), true)
 	BONE_TEXTURES = [
@@ -235,23 +249,34 @@ var _sword_cell: Vector2i = Vector2i.ZERO
 var _shield_cell: Vector2i = Vector2i.ZERO
 var _potion_cell: Vector2i = Vector2i.ZERO
 var _potion2_cell: Vector2i = Vector2i.ZERO
-var _rune1_cell: Vector2i = Vector2i.ZERO
-var _rune2_cell: Vector2i = Vector2i.ZERO
+var _rune1_cells: Array[Vector2i] = []
+var _rune2_cells: Array[Vector2i] = []
 var _torch_cell: Vector2i = Vector2i.ZERO
+var _ring_cell: Vector2i = Vector2i.ZERO
 var _codex_cell: Vector2i = Vector2i.ZERO
 var _key_collected: bool = false
+var _key_on_level: bool = false
+var _entrance_cell: Vector2i = Vector2i.ZERO
 var _sword_collected: bool = false
 var _shield_collected: bool = false
 var _potion_collected: bool = false
 var _potion2_collected: bool = false
-var _rune1_collected: bool = false
-var _rune2_collected: bool = false
+var _rune1_collected_count: int = 0
+var _rune2_collected_count: int = 0
 var _torch_collected: bool = false
+var _ring_collected: bool = false
 var _codex_collected: bool = false
+var _crown_collected: bool = false
 var _key1_icon_persistent: bool = false
 var _key2_icon_persistent: bool = false
+var _key3_icon_persistent: bool = false
+var _key1_collected: bool = false
+var _key2_collected: bool = false
+var _key3_collected: bool = false
 var _codex_icon_persistent: bool = false
 var _crown_icon_persistent: bool = false
+var _entrance_rearm: bool = false
+var _exit_rearm: bool = false
 var _grid_size: Vector2i = Vector2i.ZERO
 var _game_over: bool = false
 var _won: bool = false
@@ -263,19 +288,26 @@ var _skeletons: Array[Skeleton] = []
 var _mice: Array[Mouse] = []
 var _traps: Array[Trap] = []
 var _potion2_node: Item
-var _rune1_node: Item
-var _rune2_node: Item
+var _rune1_nodes: Array[Item] = []
+var _rune2_nodes: Array[Item] = []
 var _torch_node: Item
+var _ring_node: Item
 var _door_cell: Vector2i = Vector2i.ZERO
 var _hp_max: int = 3
 var _hp_current: int = 3
 var _door_is_open: bool = false
 var _level: int = 1
-var _crown_collected: bool = false
+var _max_level: int = 2
 var _is_transitioning: bool = false
 var _torch_target_level: int = 1
 var _last_trap_cell: Vector2i = Vector2i(-1, -1)
 var _bone_cells := {}
+var _level_special_map := {} # level -> special type
+var _special_levels := {} # special type -> level
+var _level_key_map := {} # level -> key type
+var _rune1_plan := {} # level -> count
+var _rune2_plan := {}
+var _level_states := {}
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -332,18 +364,44 @@ func _process(_delta: float) -> void:
 		return
 	# proceed with gameplay checks
 	# Simple collision checks on grid
+	var on_entrance := (_level > 1 and cp == _entrance_cell)
+	if on_entrance and _entrance_rearm:
+		print("[DEBUG] Entrance travel trigger: level=", _level, " cp=", cp, " entrance_cell=", _entrance_cell)
+		_travel_to_level(_level - 1, false)
+		return
+	if not on_entrance and _level > 1:
+		_entrance_rearm = true
+	var on_exit := (cp == _door_cell)
+	if on_exit and _exit_rearm and (not _key_on_level or _key_collected):
+		if _level < _max_level:
+			_travel_to_level(_level + 1, true)
+			return
+		else:
+			_won = true
+			_game_over = true
+			if player.has_method("set_control_enabled"):
+				player.set_control_enabled(false)
+	# re-arm exit once player leaves tile
+	if not on_exit:
+		_exit_rearm = true
 	if not _key_collected and cp == _key_cell:
 		_key_collected = true
-		if _level == 1:
+		var ktype := _current_key_type()
+		if ktype == &"key1":
+			_key1_collected = true
 			_key1_icon_persistent = true
-		else:
+		elif ktype == &"key2":
+			_key2_collected = true
 			_key2_icon_persistent = true
+		elif ktype == &"key3":
+			_key3_collected = true
+			_key3_icon_persistent = true
 		print("GOT KEY")
 		if _key_node:
 			_key_node.collect()
+		_play_sfx(SFX_DOOR_OPEN)
 		_add_score(1)
 		_update_door_texture()
-		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_check_win()
 	if not _sword_collected and cp == _sword_cell:
@@ -379,30 +437,29 @@ func _process(_delta: float) -> void:
 			_update_hud_hearts()
 			_play_sfx(SFX_PICKUP1)
 			_blink_node(player)
-	# Level-specific special pickup (codex on L1, crown on L2)
-	if _level == 1:
-		if not _codex_collected and cp == _codex_cell:
-			_codex_collected = true
-			_codex_icon_persistent = true
-			print("GOT CODEX")
-			if _codex_node:
-				_codex_node.collect()
-			_add_score(1)
-			_update_door_texture()
-			_play_sfx(SFX_PICKUP2)
-			_blink_node(player)
-			_check_win()
-	else:
-		if not _crown_collected and cp == _codex_cell:
-			_crown_collected = true
-			_crown_icon_persistent = true
-			print("GOT CROWN")
-			if _codex_node:
-				_codex_node.collect()
-			_add_score(1)
-			_update_door_texture()
-			_play_sfx(SFX_PICKUP2)
-			_blink_node(player)
+	# Special pickups (codex, crown, ring)
+	var st := _current_level_special_type()
+	if st == &"codex" and not _codex_collected and cp == _codex_cell:
+		_codex_collected = true
+		_codex_icon_persistent = true
+		print("GOT CODEX")
+		if _codex_node:
+			_codex_node.collect()
+		_add_score(1)
+		_update_door_texture()
+		_play_sfx(SFX_PICKUP2)
+		_blink_node(player)
+		_check_win()
+	elif st == &"crown" and not _crown_collected and cp == _codex_cell:
+		_crown_collected = true
+		_crown_icon_persistent = true
+		print("GOT CROWN")
+		if _codex_node:
+			_codex_node.collect()
+		_add_score(1)
+		_update_door_texture()
+		_play_sfx(SFX_PICKUP2)
+		_blink_node(player)
 	if not _shield_collected and cp == _shield_cell:
 		_shield_collected = true
 		print("GOT SHIELD")
@@ -422,6 +479,15 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_add_score(1)
+	if not _ring_collected and _current_level_special_type() == &"ring" and cp == _ring_cell:
+		_ring_collected = true
+		print("GOT RING")
+		if _ring_node:
+			_ring_node.collect()
+		_play_sfx(SFX_PICKUP1)
+		_blink_node(player)
+		_add_score(1)
+		_ring_cell = Vector2i(-1, -1)
 
 	if not _game_over:
 		var enemy: Enemy = _get_enemy_at(cp)
@@ -436,23 +502,25 @@ func _process(_delta: float) -> void:
 					_last_trap_cell = cp
 			else:
 				_last_trap_cell = Vector2i(-1, -1)
-	# Rune pickups: rune-1 (+1 attack) and rune-2 (+1 defense i.e., -1 goblin roll)
-	if not _rune1_collected and cp == _rune1_cell:
-		_rune1_collected = true
-		print("GOT RUNE-1 (+1 ATK)")
-		if _rune1_node:
-			_rune1_node.collect()
-		_play_sfx(SFX_PICKUP2)
-		_blink_node(player)
-		_add_score(1)
-	if not _rune2_collected and cp == _rune2_cell:
-		_rune2_collected = true
-		print("GOT RUNE-2 (+1 DEF)")
-		if _rune2_node:
-			_rune2_node.collect()
-		_play_sfx(SFX_PICKUP2)
-		_blink_node(player)
-		_add_score(1)
+		# Rune pickups: rune-1 (+1 attack) and rune-2 (+1 defense i.e., -1 goblin roll)
+		for r1 in _rune1_nodes:
+			if r1 != null and not r1.collected and cp == r1.grid_cell:
+				_rune1_collected_count += 1
+				print("GOT RUNE-1 (+1 ATK)")
+				r1.collect()
+				_play_sfx(SFX_PICKUP2)
+				_blink_node(player)
+				_add_score(1)
+				break
+		for r2 in _rune2_nodes:
+			if r2 != null and not r2.collected and cp == r2.grid_cell:
+				_rune2_collected_count += 1
+				print("GOT RUNE-2 (+1 DEF)")
+				r2.collect()
+				_play_sfx(SFX_PICKUP2)
+				_blink_node(player)
+				_add_score(1)
+				break
 	# Check win condition each frame after movement/collisions
 	_check_win()
 	# Restart on SPACE/ENTER when game over
@@ -612,20 +680,54 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	var has_free_neighbor := Callable(self, "_has_free_neighbor")
 	_clear_enemies()
 	_clear_mice()
+	_clear_runes()
 	_reset_items_visibility()
-	# Place key
-	_key_cell = _level_builder.pick_free_interior_cell(grid_size, [player_cell], is_free, has_free_neighbor)
-	if _key_node:
-		_key_node.place(_key_cell)
-	# Place sword
-	if not _sword_collected:
+	# Place key (may be absent on some levels)
+	var key_type := _current_key_type()
+	_key_on_level = false
+	if key_type != StringName():
+		if _is_key_type_collected(key_type):
+			_key_cell = Vector2i(-1, -1)
+			_key_collected = true
+			if key_type == &"key1":
+				_key1_collected = true
+				_key1_icon_persistent = true
+			elif key_type == &"key2":
+				_key2_collected = true
+				_key2_icon_persistent = true
+			elif key_type == &"key3":
+				_key3_collected = true
+				_key3_icon_persistent = true
+			if _key_node:
+				_key_node.visible = false
+		else:
+			_key_on_level = true
+			_key_collected = false
+			_key_cell = _level_builder.pick_free_interior_cell(grid_size, [player_cell], is_free, has_free_neighbor)
+			if _key_node:
+				_set_sprite_tex(_key_node, _key_texture_for_type(key_type))
+				_key_node.place(_key_cell)
+	else:
+		_key_cell = Vector2i(-1, -1)
+		if _key_node:
+			_key_node.visible = false
+			_key_node.collected = true
+	if not _key_on_level:
+		_key_collected = true
+		if key_type == &"key1":
+			_key1_collected = true
+		elif key_type == &"key2":
+			_key2_collected = true
+		elif key_type == &"key3":
+			_key3_collected = true
+	# Place sword/shield only on first level
+	if _level == 1 and not _sword_collected:
 		_sword_cell = _level_builder.pick_free_interior_cell(grid_size, [player_cell, _key_cell], is_free, has_free_neighbor)
 		if _sword_node:
 			_sword_node.place(_sword_cell)
 	elif _sword_node:
-		_sword_node.collect()
-	# Place shield
-	if not _shield_collected:
+		_sword_node.visible = false
+	if _level == 1 and not _shield_collected:
 		_shield_cell = _level_builder.pick_free_interior_cell(
 			grid_size,
 			[player_cell, _key_cell, _sword_cell],
@@ -635,18 +737,24 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		if _shield_node:
 			_shield_node.place(_shield_cell)
 	elif _shield_node:
-		_shield_node.collect()
-	# Place potion(s)
-	_potion_cell = _level_builder.pick_free_interior_cell(
-		grid_size,
-		[player_cell, _key_cell, _sword_cell, _shield_cell],
-		is_free,
-		has_free_neighbor
-	)
-	if _potion_node:
-		_potion_node.place(_potion_cell)
-	# On level 2+, add a second potion at a distinct free cell
-	if _level >= 2:
+		_shield_node.visible = false
+	# Place potion(s): between 0-2 per level
+	var potion_count := _rng.randi_range(0, 2)
+	if potion_count > 0:
+		_potion_cell = _level_builder.pick_free_interior_cell(
+			grid_size,
+			[player_cell, _key_cell, _sword_cell, _shield_cell],
+			is_free,
+			has_free_neighbor
+		)
+		if _potion_node:
+			_potion_node.place(_potion_cell)
+	else:
+		_potion_cell = Vector2i(-1, -1)
+		_potion_collected = true
+		if _potion_node:
+			_potion_node.visible = false
+	if potion_count > 1:
 		var exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell]
 		_potion2_cell = _level_builder.pick_free_interior_cell(grid_size, exclude, is_free, has_free_neighbor)
 		if _potion2_node == null and _potion_node != null:
@@ -657,66 +765,111 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		if _potion2_node != null:
 			_potion2_node.place(_potion2_cell)
 			_potion2_node.visible = true
-	# Place codex (or crown on L2) avoiding potions
-	var codex_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell]
-	if _level >= 2:
-		codex_exclude.append(_potion2_cell)
-	_codex_cell = _level_builder.pick_free_interior_cell(grid_size, codex_exclude, is_free, has_free_neighbor)
-	if _codex_node:
-		_codex_node.place(_codex_cell)
-	# Place runes (only on level 2+, if not already collected)
-	if _level >= 2:
-		var base_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
-		base_exclude.append(_potion2_cell)
-		if not _rune1_collected:
-			_rune1_cell = _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
-			base_exclude.append(_rune1_cell)
-			if _rune1_node == null:
-				_rune1_node = _make_item_node("Rune1", RUNE1_TEX)
-				add_child(_rune1_node)
-			_rune1_node.place(_rune1_cell)
-			_rune1_node.visible = true
-		else:
-			if _rune1_node:
-				_rune1_node.visible = false
-		if not _rune2_collected:
-			_rune2_cell = _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
-			if _rune2_node == null:
-				_rune2_node = _make_item_node("Rune2", RUNE2_TEX)
-				add_child(_rune2_node)
-			_rune2_node.place(_rune2_cell)
-			_rune2_node.visible = true
-		else:
-			if _rune2_node:
-				_rune2_node.visible = false
-	# Torch placement: only once per run, on either L1 or L2
-	if not _torch_collected and _level == _torch_target_level:
-		var exclude2: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
-		if _level >= 2:
-			exclude2.append(_potion2_cell)
-		if _rune1_cell != Vector2i.ZERO:
-			exclude2.append(_rune1_cell)
-		if _rune2_cell != Vector2i.ZERO:
-			exclude2.append(_rune2_cell)
-		_torch_cell = _level_builder.pick_free_interior_cell(grid_size, exclude2, is_free, has_free_neighbor)
-		if _torch_node == null:
-			_torch_node = _make_item_node("Torch", TORCH_TEX)
-			add_child(_torch_node)
-		_torch_node.place(_torch_cell)
-		_torch_node.visible = true
 	else:
-		# Hide runes entirely on level 1
-		if _rune1_node:
-			_rune1_node.visible = false
-		if _rune2_node:
-			_rune2_node.visible = false
+		_potion2_cell = Vector2i(-1, -1)
+		_potion2_collected = true
+		if _potion2_node:
+			_potion2_node.visible = false
+	# Place special (codex/crown/ring) avoiding potions
+	var special_type := _current_level_special_type()
+	var special_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell]
+	if _potion_cell != Vector2i(-1, -1):
+		special_exclude.append(_potion_cell)
+	if _potion2_cell != Vector2i(-1, -1):
+		special_exclude.append(_potion2_cell)
+	if special_type == &"codex" or special_type == &"crown":
+		if (special_type == &"codex" and _codex_collected) or (special_type == &"crown" and _crown_collected):
+			_codex_cell = Vector2i(-1, -1)
+			if _codex_node:
+				_codex_node.visible = false
+		else:
+			_codex_cell = _level_builder.pick_free_interior_cell(grid_size, special_exclude, is_free, has_free_neighbor)
+			if _codex_node:
+				_codex_node.place(_codex_cell)
+	elif special_type == &"ring":
+		if _ring_collected:
+			_ring_cell = Vector2i(-1, -1)
+			if _ring_node:
+				_ring_node.visible = false
+		else:
+			_ring_cell = _level_builder.pick_free_interior_cell(grid_size, special_exclude, is_free, has_free_neighbor)
+			if _ring_node == null:
+				_ring_node = _make_item_node("Ring", RING_TEX)
+				add_child(_ring_node)
+			_ring_node.place(_ring_cell)
+			_ring_node.visible = true
+	else:
+		_codex_cell = Vector2i(-1, -1)
+		_ring_cell = Vector2i(-1, -1)
+		if _codex_node:
+			_codex_node.visible = false
+		if _ring_node and special_type != &"ring":
+			_ring_node.visible = false
+	# Place runes according to run-level plan
+	var base_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell]
+	if _potion_cell != Vector2i(-1, -1):
+		base_exclude.append(_potion_cell)
+	if _potion2_cell != Vector2i(-1, -1):
+		base_exclude.append(_potion2_cell)
+	if _codex_cell != Vector2i.ZERO:
+		base_exclude.append(_codex_cell)
+	if special_type == &"ring" and _ring_cell != Vector2i.ZERO:
+		base_exclude.append(_ring_cell)
+	var rune1_to_place: int = int(_rune1_plan.get(_level, 0))
+	var rune2_to_place: int = int(_rune2_plan.get(_level, 0))
+	for i_r1 in range(rune1_to_place):
+		var cell1 := _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
+		base_exclude.append(cell1)
+		_rune1_cells.append(cell1)
+		var node1 := _make_item_node("Rune1%d" % i_r1, RUNE1_TEX)
+		add_child(node1)
+		node1.place(cell1)
+		_rune1_nodes.append(node1)
+	for i_r2 in range(rune2_to_place):
+		var cell2 := _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
+		base_exclude.append(cell2)
+		_rune2_cells.append(cell2)
+		var node2: Item = _make_item_node("Rune2%d" % i_r2, RUNE2_TEX)
+		add_child(node2)
+		node2.place(cell2)
+		_rune2_nodes.append(node2)
+	# Torch placement: only once per run
+		if not _torch_collected and _level == _torch_target_level:
+			var exclude2: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell]
+			if _potion_cell != Vector2i(-1, -1):
+				exclude2.append(_potion_cell)
+			if _potion2_cell != Vector2i(-1, -1):
+				exclude2.append(_potion2_cell)
+			for c1 in _rune1_cells:
+				exclude2.append(c1)
+			for c2 in _rune2_cells:
+				exclude2.append(c2)
+			if special_type == &"ring" and _ring_cell != Vector2i.ZERO:
+				exclude2.append(_ring_cell)
+			if _codex_cell != Vector2i.ZERO:
+				exclude2.append(_codex_cell)
+			_torch_cell = _level_builder.pick_free_interior_cell(grid_size, exclude2, is_free, has_free_neighbor)
+			if _torch_node == null:
+				_torch_node = _make_item_node("Torch", TORCH_TEX)
+				add_child(_torch_node)
+			_torch_node.place(_torch_cell)
+			_torch_node.visible = true
+		else:
+			if _torch_node and _level != _torch_target_level:
+				_torch_node.visible = false
 	# Debug placement dump
-	print("[DEBUG] L", _level, " placements:")
+	print("[DEBUG] L", _level, " of ", _max_level ," placements:")
 	print("  key=", _key_cell, " sword=", _sword_cell, " shield=", _shield_cell)
 	print("  potion1=", _potion_cell, " potion2=", (_potion2_cell if _level >= 2 else Vector2i(-1, -1)))
-	print("  special(cell)=", _codex_cell, " collected L1? ", _codex_collected, " crown L2+? ", _crown_collected)
-	# Decide total goblins: base + 0-3 extra
-	var total := 1 + _rng.randi_range(0, 3)
+	print("  special=", _current_level_special_type(), " codex? ", _codex_collected, " crown? ", _crown_collected, " ring? ", _ring_collected)
+	print(
+		"  torch=",
+		(_torch_cell if _level == _torch_target_level and not _torch_collected else Vector2i(-1, -1)),
+		" ring=",
+		(_ring_cell if _current_level_special_type() == &"ring" and not _ring_collected else Vector2i(-1, -1))
+	)
+	# Decide total goblins scaled by level
+	var total := 1 + int(max(0, _level - 1)) + _rng.randi_range(0, 2)
 	var attempts := 0
 	for i in range(total):
 		attempts = 0
@@ -735,25 +888,29 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			break
 		_spawn_goblin_at(gcell)
 
-	# Spawn exactly one zombie per level
-	var zcell := _level_builder.pick_free_interior_cell(
-		grid_size,
-		[player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell],
-		is_free,
-		has_free_neighbor
-	)
-	_spawn_zombie_at(zcell)
-	# Spawn minotaur only on level 2, exactly one
-	if _level >= 2:
-		var mcell := _level_builder.pick_free_interior_cell(
+	# Spawn zombies scaled modestly
+	var zombie_count: int = 1 + int((_level - 1) / 3)
+	var zcells: Array[Vector2i] = []
+	for i2 in range(zombie_count):
+		var z_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
+		z_exclude.append_array(zcells)
+		var zcell := _level_builder.pick_free_interior_cell(
 			grid_size,
-			[player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell, zcell],
+			z_exclude,
 			is_free,
 			has_free_neighbor
 		)
+		zcells.append(zcell)
+		_spawn_zombie_at(zcell)
+	# Spawn minotaurs scaled slowly
+	var mino_count: int = int(1 + (_level - 3) / 4) if _level >= 3 else 0
+	for i3 in range(mino_count):
+		var m_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _potion_cell, _codex_cell]
+		m_exclude.append_array(zcells)
+		var mcell := _level_builder.pick_free_interior_cell(grid_size, m_exclude, is_free, has_free_neighbor)
 		_spawn_minotaur_at(mcell)
 	# Spawn 0-3 mice per level as non-hostile wanderers
-	var mice_count := _rng.randi_range(0, 3)
+	var mice_count: int = _rng.randi_range(0, 3)
 	for i in range(mice_count):
 		var attempts_mouse := 0
 		var mcell2 := Vector2i.ZERO
@@ -768,27 +925,25 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 				continue
 			break
 		_spawn_mouse_at(mcell2)
-	# Spawn 0-2 traps
-	var traps_total := _rng.randi_range(0, 2)
+	# Spawn traps scaling with level
+	var traps_total: int = int(clamp(_rng.randi_range(0, 2) + (_level - 1), 0, 6))
 	for i in range(traps_total):
-		var tcell := _level_builder.pick_free_interior_cell(
-			grid_size,
-			[
-				player_cell,
-				_key_cell,
-				_sword_cell,
-				_shield_cell,
-				_potion_cell,
-				_potion2_cell,
-				_codex_cell,
-				_rune1_cell,
-				_rune2_cell,
-				_torch_cell,
-				zcell
-			],
-			is_free,
-			has_free_neighbor
-		)
+		var t_exclude: Array[Vector2i] = [
+			player_cell,
+			_key_cell,
+			_sword_cell,
+			_shield_cell,
+			_potion_cell,
+			_potion2_cell,
+			_codex_cell,
+			_torch_cell,
+			_ring_cell
+		]
+		t_exclude.append_array(_rune1_cells)
+		t_exclude.append_array(_rune2_cells)
+		if not zcells.is_empty():
+			t_exclude.append(zcells[0])
+		var tcell := _level_builder.pick_free_interior_cell(grid_size, t_exclude, is_free, has_free_neighbor)
 		_spawn_trap_at(tcell)
 
 func _restart_game() -> void:
@@ -800,27 +955,44 @@ func _restart_game() -> void:
 	# Reset flags
 	_game_over = false
 	_key_collected = false
+	_key_on_level = false
+	_key1_collected = false
+	_key2_collected = false
+	_key3_collected = false
 	_sword_collected = false
 	_shield_collected = false
-	_rune1_collected = false
-	_rune2_collected = false
 	_potion_collected = false
 	_potion2_collected = false
 	_codex_collected = false
 	_crown_collected = false
 	_codex_collected = false
+	_ring_collected = false
+	_rune1_collected_count = 0
+	_rune2_collected_count = 0
+	_ring_cell = Vector2i.ZERO
+	_rune1_cells.clear()
+	_rune2_cells.clear()
 	_key1_icon_persistent = false
 	_key2_icon_persistent = false
+	_key3_icon_persistent = false
 	_codex_icon_persistent = false
 	_crown_icon_persistent = false
+	_entrance_rearm = false
 	_score = 0
 	_door_is_open = false
 	_hp_current = _hp_max
 	_level = 1
+	_prepare_run_layout()
+	_level_states.clear()
 	_torch_collected = false
-	_torch_target_level = _rng.randi_range(1, 2)
+	_torch_target_level = _rng.randi_range(1, _max_level)
+	_ring_collected = false
+	_ring_cell = Vector2i.ZERO
+	_rune1_cells.clear()
+	_rune2_cells.clear()
 	_last_trap_cell = Vector2i(-1, -1)
 	_clear_enemies()
+	_clear_runes()
 	# Clear maps
 	floor_map.clear()
 	walls_map.clear()
@@ -907,11 +1079,11 @@ func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 		var enemy_roll: int = _rng.randi_range(1, 20)
 		if _sword_collected:
 			player_roll += 1
-		if _rune1_collected:
+		if _has_rune1():
 			player_roll += 1
 		if _shield_collected:
 			enemy_roll -= 1
-		if _rune2_collected:
+		if _has_rune2():
 			enemy_roll -= 1
 		print("Player rolls ", player_roll, ", ", enemy.enemy_type, " rolls ", enemy_roll)
 		if player_roll == enemy_roll:
@@ -988,22 +1160,384 @@ func _check_win() -> void:
 	# Prevent re-entrant loads while transitioning
 	if _is_transitioning:
 		return
-	# Require key plus level-appropriate special item
-	var special_ok := (_level == 1 and _codex_collected) or (_level >= 2 and _crown_collected)
-	if not _key_collected or not special_ok:
+	# Require key plus special requirements
+	var key_needed := _key_on_level
+	if key_needed and not _key_collected:
+		return
+	var specials_collected := _codex_collected and _crown_collected and _ring_collected
+	if _level >= _max_level and not specials_collected:
 		return
 	# Player must be standing on the door cell and the door must be open (door-2)
 	var cp := Grid.world_to_cell(player.global_position)
-	if cp == _door_cell and _door_sprite != null and _door_sprite.texture == DOOR_TEX_2:
-		if _level == 1:
-			_is_transitioning = true
-			_load_next_level()
+	if cp == _door_cell:
+		print(
+			"[DEBUG] Door check: level=",
+			_level,
+			"/",
+			_max_level,
+			" cp=",
+			cp,
+			" door_cell=",
+			_door_cell,
+			" key_on_level=",
+			_key_on_level,
+			" key_collected=",
+			_key_collected,
+			" door_is_open=",
+			_door_is_open,
+			" specials_final=",
+			specials_collected,
+			" transitioning=",
+			_is_transitioning
+		)
+	if cp == _door_cell and (not _key_on_level or _key_collected) and _exit_rearm:
+		if _level < _max_level:
+			_travel_to_level(_level + 1, true)
 			return
-		# Level 2+: show win screen
+		# Final level: show win screen
 		_won = true
 		_game_over = true
 		if player.has_method("set_control_enabled"):
 			player.set_control_enabled(false)
+
+func _current_level_special_required() -> bool:
+	return _level_special_map.has(_level)
+
+func _current_level_special_type() -> StringName:
+	if _level_special_map.has(_level):
+		return _level_special_map[_level]
+	return StringName()
+
+func _level_special_collected() -> bool:
+	var t := _current_level_special_type()
+	if t == &"codex":
+		return _codex_collected
+	if t == &"crown":
+		return _crown_collected
+	if t == &"ring":
+		return _ring_collected
+	return false
+
+func _current_key_type() -> StringName:
+	if _level_key_map.has(_level):
+		return _level_key_map[_level]
+	return StringName()
+
+func _key_texture_for_type(key_type: StringName) -> Texture2D:
+	if key_type == &"key1":
+		return KEY_TEX_1
+	if key_type == &"key2":
+		return KEY_TEX_2
+	if key_type == &"key3":
+		return KEY_TEX_3
+	return null
+
+func _is_key_type_collected(key_type: StringName) -> bool:
+	if key_type == &"key1":
+		return _key1_collected
+	if key_type == &"key2":
+		return _key2_collected
+	if key_type == &"key3":
+		return _key3_collected
+	return false
+
+func _has_rune1() -> bool:
+	return _rune1_collected_count > 0
+
+func _has_rune2() -> bool:
+	return _rune2_collected_count > 0
+
+func _apply_restored_items() -> void:
+	if _key_node:
+		if _key_on_level and not _key_collected:
+			_key_node.place(_key_cell)
+			_key_node.visible = true
+		else:
+			_key_node.visible = false
+			_key_node.collected = true
+	if _sword_node:
+		if not _sword_collected and _level == 1:
+			_sword_node.place(_sword_cell)
+			_sword_node.visible = true
+		else:
+			_sword_node.visible = false
+	if _shield_node:
+		if not _shield_collected and _level == 1:
+			_shield_node.place(_shield_cell)
+			_shield_node.visible = true
+		else:
+			_shield_node.visible = false
+	if _potion_node:
+		if not _potion_collected and _potion_cell != Vector2i(-1, -1):
+			_potion_node.place(_potion_cell)
+			_potion_node.visible = true
+		else:
+			_potion_node.visible = false
+	if _potion2_node:
+		if not _potion2_collected and _potion2_cell != Vector2i(-1, -1):
+			_potion2_node.place(_potion2_cell)
+			_potion2_node.visible = true
+		else:
+			_potion2_node.visible = false
+	var st := _current_level_special_type()
+	if _codex_node:
+		if (st == &"codex" and not _codex_collected) or (st == &"crown" and not _crown_collected):
+			_codex_node.place(_codex_cell)
+			_codex_node.visible = true
+		else:
+			_codex_node.visible = false
+	if _ring_node:
+		if st == &"ring" and not _ring_collected:
+			_ring_node.place(_ring_cell)
+			_ring_node.visible = true
+		else:
+			_ring_node.visible = false
+	if _torch_node:
+		if _level == _torch_target_level and not _torch_collected:
+			_torch_node.place(_torch_cell)
+			_torch_node.visible = true
+		else:
+			_torch_node.visible = false
+	if _door_node:
+		_door_node.global_position = Grid.cell_to_world(_door_cell)
+	if _entrance_door_node:
+		_entrance_door_node.global_position = Grid.cell_to_world(_entrance_cell)
+
+func _save_level_state(level: int) -> void:
+	var state := {}
+	state["player_cell"] = Grid.world_to_cell(player.global_position)
+	state["key_on_level"] = _key_on_level
+	state["key_cell"] = _key_cell
+	state["key_collected"] = _key_collected
+	state["key_type"] = _current_key_type()
+	state["sword_cell"] = _sword_cell
+	state["sword_collected"] = _sword_collected
+	state["shield_cell"] = _shield_cell
+	state["shield_collected"] = _shield_collected
+	state["potion_cell"] = _potion_cell
+	state["potion_collected"] = _potion_collected
+	state["potion2_cell"] = _potion2_cell
+	state["potion2_collected"] = _potion2_collected
+	state["codex_cell"] = _codex_cell
+	state["codex_collected"] = _codex_collected
+	state["ring_cell"] = _ring_cell
+	state["ring_collected"] = _ring_collected
+	state["crown_collected"] = _crown_collected
+	state["torch_cell"] = _torch_cell
+	state["torch_collected"] = _torch_collected
+	state["rune1_cells"] = []
+	state["rune2_cells"] = []
+	for r1 in _rune1_nodes:
+		if r1 != null and not r1.collected:
+			state["rune1_cells"].append(r1.grid_cell)
+	for r2 in _rune2_nodes:
+		if r2 != null and not r2.collected:
+			state["rune2_cells"].append(r2.grid_cell)
+	state["exit_cell"] = _door_cell
+	state["entrance_cell"] = _entrance_cell
+	state["door_open"] = _door_is_open
+	state["key_on_level"] = _key_on_level
+	# Enemies/traps/mice
+	var enemies: Array = []
+	for g in _goblins:
+		enemies.append({
+			"type": "goblin",
+			"cell": g.grid_cell,
+			"alive": g.alive
+		})
+	for z in _zombies:
+		enemies.append({
+			"type": "zombie",
+			"cell": z.grid_cell,
+			"alive": z.alive
+		})
+	for m in _minotaurs:
+		enemies.append({
+			"type": "minotaur",
+			"cell": m.grid_cell,
+			"alive": m.alive,
+			"hp": m.hp
+		})
+	for sk in _skeletons:
+		enemies.append({
+			"type": "skeleton",
+			"cell": sk.grid_cell,
+			"alive": sk.alive,
+			"hp": sk.hp
+		})
+	var traps: Array = []
+	for t in _traps:
+		traps.append({"cell": t.grid_cell})
+	var mice: Array = []
+	for m2 in _mice:
+		mice.append({
+			"cell": m2.grid_cell,
+			"alive": m2.alive
+		})
+	# Persist inner walls/blocks (skip borders)
+	var walls: Array = []
+	for c in walls_map.get_used_cells(0):
+		if c.x <= 0 or c.y <= 0 or c.x >= _grid_size.x - 1 or c.y >= _grid_size.y - 1:
+			continue
+		var sid := walls_map.get_cell_source_id(0, c)
+		if sid != -1:
+			walls.append({"cell": c, "sid": sid})
+	var corpses: Array = []
+	for child in _decor.get_children():
+		if child is Sprite2D:
+			var spr := child as Sprite2D
+			if spr.texture == DEAD_GOBLIN_TEX or spr.texture == ZOMBIE_TEX_2 or spr.texture == MINO_TEX_2 or spr.texture in BONE_TEXTURES:
+				corpses.append({
+					"texture": spr.texture,
+					"pos": spr.global_position
+				})
+	state["corpses"] = corpses
+	state["enemies"] = enemies
+	state["traps"] = traps
+	state["mice"] = mice
+	state["walls"] = walls
+	_level_states[level] = state
+
+func _restore_level_state(level: int, entering_forward: bool) -> void:
+	var state: Dictionary = _level_states.get(level, null)
+	if state == null:
+		return
+	_key_on_level = state.get("key_on_level", false)
+	_key_cell = state.get("key_cell", Vector2i(-1, -1))
+	_key_collected = state.get("key_collected", false)
+	var key_type: StringName = state.get("key_type", StringName())
+	if key_type == &"key1":
+		_key1_collected = _key1_collected or _key_collected
+		if _key1_collected:
+			_key1_icon_persistent = true
+	elif key_type == &"key2":
+		_key2_collected = _key2_collected or _key_collected
+		if _key2_collected:
+			_key2_icon_persistent = true
+	elif key_type == &"key3":
+		_key3_collected = _key3_collected or _key_collected
+		if _key3_collected:
+			_key3_icon_persistent = true
+	_sword_cell = state.get("sword_cell", _sword_cell)
+	_sword_collected = state.get("sword_collected", _sword_collected)
+	_shield_cell = state.get("shield_cell", _shield_cell)
+	_shield_collected = state.get("shield_collected", _shield_collected)
+	_potion_cell = state.get("potion_cell", _potion_cell)
+	_potion_collected = state.get("potion_collected", _potion_collected)
+	_potion2_cell = state.get("potion2_cell", _potion2_cell)
+	_potion2_collected = state.get("potion2_collected", _potion2_collected)
+	_codex_cell = state.get("codex_cell", _codex_cell)
+	_codex_collected = state.get("codex_collected", _codex_collected)
+	_ring_cell = state.get("ring_cell", _ring_cell)
+	_ring_collected = state.get("ring_collected", _ring_collected)
+	_crown_collected = state.get("crown_collected", _crown_collected)
+	_torch_cell = state.get("torch_cell", _torch_cell)
+	_torch_collected = state.get("torch_collected", _torch_collected)
+	_door_cell = state.get("exit_cell", _door_cell)
+	_entrance_cell = state.get("entrance_cell", _entrance_cell)
+	_door_is_open = state.get("door_open", false)
+	var r1_state: Array = state.get("rune1_cells", [])
+	var r2_state: Array = state.get("rune2_cells", [])
+	_rune1_cells = []
+	_rune2_cells = []
+	for v in r1_state:
+		if v is Vector2i:
+			_rune1_cells.append(v)
+	for v2 in r2_state:
+		if v2 is Vector2i:
+			_rune2_cells.append(v2)
+	_clear_runes()
+	for rc1 in _rune1_cells:
+		var n1 := _make_item_node("Rune1Restore", RUNE1_TEX)
+		add_child(n1)
+		n1.place(rc1)
+		_rune1_nodes.append(n1)
+	for rc2 in _rune2_cells:
+		var n2 := _make_item_node("Rune2Restore", RUNE2_TEX)
+		add_child(n2)
+		n2.place(rc2)
+		_rune2_nodes.append(n2)
+	var spawn_cell: Vector2i = _entrance_cell
+	if not entering_forward:
+		spawn_cell = _door_cell
+	if state.has("player_cell") and entering_forward:
+		spawn_cell = state["player_cell"]
+	_place_player(spawn_cell)
+
+func _restore_entities_from_state(level: int) -> void:
+	var state: Dictionary = _level_states.get(level, {})
+	_clear_enemies()
+	_clear_mice()
+	_clear_traps()
+	# Restore walls before entities if present
+	_restore_walls_from_state(state)
+	var enemies: Array = state.get("enemies", [])
+	for e in enemies:
+		var etype: String = e.get("type", "")
+		var cell: Vector2i = e.get("cell", Vector2i.ZERO)
+		var alive: bool = e.get("alive", true)
+		if etype == "goblin":
+			var gcell := cell
+			_spawn_goblin_at(gcell)
+			if not alive:
+				_goblins.back().alive = false
+				_goblins.back().visible = false
+		elif etype == "zombie":
+			var zcell := cell
+			_spawn_zombie_at(zcell)
+			if not alive:
+				_zombies.back().alive = false
+				_zombies.back().visible = false
+		elif etype == "minotaur":
+			var mcell := cell
+			_spawn_minotaur_at(mcell)
+			_minotaurs.back().hp = e.get("hp", _minotaurs.back().hp)
+			if not alive:
+				_minotaurs.back().alive = false
+				_minotaurs.back().visible = false
+		elif etype == "skeleton":
+			var skcell := cell
+			_spawn_skeleton_at(skcell)
+			_skeletons.back().hp = e.get("hp", _skeletons.back().hp)
+			if not alive:
+				_skeletons.back().alive = false
+				_skeletons.back().visible = false
+	var traps: Array = state.get("traps", [])
+	for t in traps:
+		var tcell: Vector2i = t.get("cell", Vector2i.ZERO)
+		_spawn_trap_at(tcell)
+	var mice: Array = state.get("mice", [])
+	for m in mice:
+		var mcell: Vector2i = m.get("cell", Vector2i.ZERO)
+		_spawn_mouse_at(mcell)
+		if not m.get("alive", true):
+			_mice.back().alive = false
+			_mice.back().visible = false
+	var corpses: Array = state.get("corpses", [])
+	for c in corpses:
+		var tex: Texture2D = c.get("texture", null)
+		var pos: Vector2 = c.get("pos", Vector2.ZERO)
+		if tex != null and _decor != null:
+			var s := Sprite2D.new()
+			s.texture = tex
+			s.centered = false
+			s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			s.global_position = pos
+			_decor.add_child(s)
+
+func _restore_walls_from_state(state: Dictionary) -> void:
+	var walls: Array = state.get("walls", [])
+	if walls.is_empty():
+		return
+	# Clear current inner walls (keep borders)
+	for c in walls_map.get_used_cells(0):
+		if c.x > 0 and c.y > 0 and c.x < _grid_size.x - 1 and c.y < _grid_size.y - 1:
+			walls_map.set_cell(0, c, -1, Vector2i.ZERO)
+	for w in walls:
+		var cell: Vector2i = w.get("cell", Vector2i.ZERO)
+		var sid: int = w.get("sid", -1)
+		if sid != -1:
+			walls_map.set_cell(0, cell, sid, TILE_WALL)
 
 func _start_game() -> void:
 	# Hide title, show HUD, reset fade
@@ -1016,22 +1550,37 @@ func _start_game() -> void:
 	_game_over = false
 	_won = false
 	_level = 1
+	_prepare_run_layout()
+	_level_states.clear()
 	_key_collected = false
+	_key_on_level = false
+	_key1_collected = false
+	_key2_collected = false
+	_key3_collected = false
 	_potion_collected = false
 	_potion2_collected = false
 	_sword_collected = false
 	_shield_collected = false
 	_torch_collected = false
+	_ring_collected = false
+	_codex_collected = false
+	_crown_collected = false
+	_rune1_collected_count = 0
+	_rune2_collected_count = 0
+	_ring_cell = Vector2i.ZERO
 	_key1_icon_persistent = false
 	_key2_icon_persistent = false
 	_codex_icon_persistent = false
 	_crown_icon_persistent = false
+	_entrance_rearm = false
+	_exit_rearm = false
 	_hp_current = _hp_max
-	_torch_target_level = _rng.randi_range(1, 2)
+	_torch_target_level = _rng.randi_range(1, _max_level)
 	_score = 0
 	_last_trap_cell = Vector2i(-1, -1)
 	_update_hud_icons()
 	_clear_enemies()
+	_clear_runes()
 	# Build board fresh
 	floor_map.clear()
 	walls_map.clear()
@@ -1082,7 +1631,7 @@ func _set_world_visible(visible: bool) -> void:
 	if _fov_overlay:
 		_fov_overlay.visible = visible
 	if _key_node:
-		_key_node.visible = visible and not _key_collected
+		_key_node.visible = visible and _key_on_level and not _key_collected
 	if _sword_node:
 		_sword_node.visible = visible and not _sword_collected
 	if _shield_node:
@@ -1093,10 +1642,18 @@ func _set_world_visible(visible: bool) -> void:
 		_potion2_node.visible = visible and _level >= 2 and not _potion2_collected
 	if _torch_node:
 		_torch_node.visible = visible and not _torch_collected and _level == _torch_target_level
+	if _ring_node:
+		_ring_node.visible = visible and not _ring_collected and _current_level_special_type() == &"ring"
+	for r1 in _rune1_nodes:
+		if r1:
+			r1.visible = visible and not r1.collected
+	for r2 in _rune2_nodes:
+		if r2:
+			r2.visible = visible and not r2.collected
 	if _codex_node:
-			# Only show special item if not collected for the current level
-			var special_uncollected := (_level == 1 and not _codex_collected) or (_level >= 2 and not _crown_collected)
-			_codex_node.visible = visible and special_uncollected
+		var st := _current_level_special_type()
+		var special_uncollected := (st == &"codex" and not _codex_collected) or (st == &"crown" and not _crown_collected)
+		_codex_node.visible = visible and special_uncollected
 	for g in _goblins:
 		g.visible = visible and g.alive
 	for z in _zombies:
@@ -1112,6 +1669,8 @@ func _set_world_visible(visible: bool) -> void:
 	_decor.visible = visible
 	if _door_node:
 		_door_node.visible = visible
+	if _entrance_door_node:
+		_entrance_door_node.visible = visible and _level > 1
 	_update_hud_icons()
 
 func _ensure_fov_overlay() -> void:
@@ -1270,35 +1829,53 @@ func _clear_traps() -> void:
 		t.queue_free()
 	_traps.clear()
 
+func _clear_runes() -> void:
+	for r in _rune1_nodes:
+		r.queue_free()
+	for r in _rune2_nodes:
+		r.queue_free()
+	_rune1_nodes.clear()
+	_rune2_nodes.clear()
+	_rune1_cells.clear()
+	_rune2_cells.clear()
+
 func _reset_items_visibility() -> void:
+	var key_type := _current_key_type()
 	if _key_node:
-		_key_node.collected = _key_collected
-		_key_node.visible = not _key_collected
+		_key_node.collected = _key_collected or key_type == StringName()
+		_key_node.visible = key_type != StringName() and not _key_collected
 	if _sword_node:
 		_sword_node.collected = _sword_collected
-		_sword_node.visible = not _sword_collected
+		_sword_node.visible = not _sword_collected and _level == 1
 	if _shield_node:
 		_shield_node.collected = _shield_collected
-		_shield_node.visible = not _shield_collected
+		_shield_node.visible = not _shield_collected and _level == 1
 	if _potion_node:
 		_potion_node.collected = _potion_collected
-		_potion_node.visible = not _potion_collected
+		_potion_node.visible = not _potion_collected and _potion_cell != Vector2i(-1, -1)
 	if _potion2_node:
 		_potion2_node.collected = _potion2_collected
-		_potion2_node.visible = _level >= 2 and not _potion2_collected
+		_potion2_node.visible = not _potion2_collected and _potion2_cell != Vector2i(-1, -1)
 	if _codex_node:
-		var special_uncollected := (_level == 1 and not _codex_collected) or (_level >= 2 and not _crown_collected)
+		var st := _current_level_special_type()
+		var needs_special := st == &"codex" or st == &"crown"
+		var special_uncollected := needs_special and not _level_special_collected()
 		_codex_node.collected = not special_uncollected
 		_codex_node.visible = special_uncollected
 	if _torch_node:
 		_torch_node.collected = _torch_collected
 		_torch_node.visible = (_level == _torch_target_level) and not _torch_collected
-	if _rune1_node:
-		_rune1_node.collected = _rune1_collected
-		_rune1_node.visible = _level >= 2 and not _rune1_collected
-	if _rune2_node:
-		_rune2_node.collected = _rune2_collected
-		_rune2_node.visible = _level >= 2 and not _rune2_collected
+	for r1 in _rune1_nodes:
+		if r1:
+			r1.collected = r1.collected
+			r1.visible = not r1.collected
+	for r2 in _rune2_nodes:
+		if r2:
+			r2.collected = r2.collected
+			r2.visible = not r2.collected
+	if _ring_node:
+		_ring_node.collected = _ring_collected
+		_ring_node.visible = _current_level_special_type() == &"ring" and not _ring_collected
 
 func _clear_bones() -> void:
 	for child in _decor.get_children():
@@ -1319,7 +1896,7 @@ func _place_bones(grid_size: Vector2i) -> void:
 				continue
 			if not _is_free(c):
 				continue
-			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell:
+			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c):
 				continue
 			if _get_enemy_at(c) != null:
 				continue
@@ -1344,7 +1921,8 @@ func _maybe_spawn_skeleton_from_bones(cell: Vector2i) -> void:
 	if not _bone_cells.has(cell):
 		return
 	# 15% chance to summon a skeleton; leave bones intact if none spawn
-	if _rng.randf() > 0.15:
+	var chance: float = clamp(0.15 + 0.03 * float(_level - 1), 0.15, 0.7)
+	if _rng.randf() > chance:
 		return
 	var bone_sprite := _bone_cells[cell] as Sprite2D
 	_bone_cells.erase(cell)
@@ -1417,80 +1995,94 @@ func _place_door(grid_size: Vector2i) -> void:
 		_door_node.global_position = Grid.cell_to_world(_door_cell)
 	_update_door_texture()
 
+func _place_entrance_door(grid_size: Vector2i) -> void:
+	# Place entrance adjacent to player start for backtracking
+	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
+	dirs.shuffle()
+	for d in dirs:
+		var c := _entrance_cell + d
+		if _is_wall(c):
+			_entrance_cell = _entrance_cell + d * 0 # keep original
+			if _entrance_door_node:
+				_entrance_door_node.global_position = Grid.cell_to_world(c)
+			return
+	# fallback: place entrance door on player's cell wall side if none found
+	if _entrance_door_node:
+		_entrance_door_node.global_position = Grid.cell_to_world(_entrance_cell)
+
 func _update_door_texture() -> void:
 	if _door_sprite == null:
 		return
-	# Door opens when the level's required items are collected
-	var special_ok := (_level == 1 and _codex_collected) or (_level >= 2 and _crown_collected)
-	var open := _key_collected and special_ok
+	# Door opens when the level's required items are collected (or if no key spawns this level)
+	var key_needed := _key_on_level
+	var open := (not key_needed or _key_collected)
 	_door_sprite.texture = DOOR_TEX_2 if open else DOOR_TEX_1
-	if open and not _door_is_open:
-		_play_sfx(SFX_DOOR_OPEN)
-		_door_is_open = true
-	elif not open:
-		_door_is_open = false
+	_door_is_open = open
+	if _entrance_door_sprite:
+		_entrance_door_sprite.texture = DOOR_TEX_3 if DOOR_TEX_3 != null else DOOR_TEX_2
+	print("[DEBUG] Door texture update: level=", _level, " key_on_level=", _key_on_level, " key_collected=", _key_collected, " open=", open, " door_cell=", _door_cell)
 
-func _load_next_level() -> void:
-	# Transition to the next level instead of ending the game
+func _travel_to_level(target_level: int, entering_forward: bool) -> void:
+	if _is_transitioning:
+		return
 	_is_transitioning = true
+	_save_level_state(_level)
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(false)
 	await _fade_to(level_fade_alpha, level_fade_out_time)
-	_level += 1
-	# Reset level-specific flags
+	_level = target_level
 	_key_collected = false
-	if _level == 2:
-		_key1_icon_persistent = true
-	_potion_collected = false
-	_potion2_collected = false
-	_codex_collected = false
-	_crown_collected = false
-	if _level == 2:
-		_codex_icon_persistent = true
+	_key_on_level = false
 	_door_is_open = false
-	# Clear and rebuild world
 	_clear_enemies()
+	_clear_runes()
 	floor_map.clear()
 	walls_map.clear()
 	var grid_size := _get_grid_size()
 	_grid_size = grid_size
 	_build_maps(grid_size)
 	_ensure_fov_overlay()
-	_place_random_inner_walls(grid_size)
-	# Start near a wall for variety and to avoid center artifacts
-	var start_cell := _pick_free_cell_next_to_wall(grid_size)
-	_place_player(start_cell)
-	# Place entities after choosing the start to avoid overlaps
-	_place_random_entities(grid_size)
-	_set_level_item_textures()
-	_clear_bones()
-	# Mark the entrance on an adjacent wall near the player's start
-	_place_entrance_marker(start_cell)
-	_place_bones(grid_size)
-	_place_door(grid_size)
+	if _level_states.has(_level):
+		_restore_level_state(_level, entering_forward)
+		_apply_restored_items()
+		_restore_entities_from_state(_level)
+	else:
+		_place_random_inner_walls(grid_size)
+		var start_cell := _pick_free_cell_next_to_wall(grid_size)
+		_entrance_cell = start_cell
+		_place_player(start_cell)
+		_place_random_entities(grid_size)
+		_set_level_item_textures()
+		_clear_bones()
+		_place_bones(grid_size)
+		_place_door(grid_size)
+		_place_entrance_door(grid_size)
+		_update_door_texture()
+		_reset_items_visibility()
+		_save_level_state(_level)
+	# Ensure entrance/exit door nodes positioned
+	if _door_node:
+		_door_node.global_position = Grid.cell_to_world(_door_cell)
+	if _entrance_door_node:
+		_entrance_door_node.global_position = Grid.cell_to_world(_entrance_cell)
+	_entrance_rearm = false
+	_exit_rearm = false
 	_update_door_texture()
-	# Ensure world/entities are visible for the new level
-	if _key_node:
-		_key_node.visible = true
-	if _sword_node:
-		_sword_node.visible = not _sword_collected
-	if _shield_node:
-		_shield_node.visible = not _shield_collected
-	if _potion_node:
-		_potion_node.visible = true
-	if _potion2_node:
-		_potion2_node.visible = _level >= 2
-	if _codex_node:
-		var special_uncollected := (_level == 1 and not _codex_collected) or (_level >= 2 and not _crown_collected)
-		_codex_node.visible = special_uncollected
 	_update_hud_icons()
 	_update_hud_hearts()
+	if _hud_level:
+		_hud_level.text = "Level: %d" % _level
 	_update_fov()
 	_set_world_visible(true)
+	print("[DEBUG] Travel complete -> level ", _level, " key_on_level=", _key_on_level, " key_collected=", _key_collected, " door_cell=", _door_cell, " entrance_cell=", _entrance_cell)
 	await _fade_to(0.0, level_fade_in_time)
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(true)
 	_is_transitioning = false
+	_exit_rearm = false
+
+func _load_next_level() -> void:
+	_travel_to_level(_level + 1, true)
 
 func _update_player_sprite_appearance() -> void:
 	if _player_sprite == null:
@@ -1513,15 +2105,26 @@ func _update_hud_icons() -> void:
 		_hud_level.text = "Level: %d" % _level
 	if _hud_hearts:
 		_hud_hearts.visible = show
-	_set_icon_visible(_hud_icon_key1, show and (_key_collected and _level == 1 or _key1_icon_persistent))
-	_set_icon_visible(_hud_icon_key2, show and (_key_collected and _level >= 2 or _key2_icon_persistent))
+	if _hud_icon_key1 and KEY_TEX_1:
+		_hud_icon_key1.texture = KEY_TEX_1
+	if _hud_icon_key2 and KEY_TEX_2:
+		_hud_icon_key2.texture = KEY_TEX_2
+	if _hud_icon_key3 and KEY_TEX_3:
+		_hud_icon_key3.texture = KEY_TEX_3
+	_set_icon_visible(_hud_icon_key1, show and _key1_collected)
+	_set_icon_visible(_hud_icon_key2, show and _key2_collected)
+	_set_icon_visible(_hud_icon_key3, show and _key3_collected)
 	_set_icon_visible(_hud_icon_sword, show and _sword_collected)
 	_set_icon_visible(_hud_icon_shield, show and _shield_collected)
-	_set_icon_visible(_hud_icon_codex, show and (_codex_collected or _codex_icon_persistent))
-	_set_icon_visible(_hud_icon_crown, show and (_crown_collected or _crown_icon_persistent))
-	_set_icon_visible(_hud_icon_rune1, show and _rune1_collected)
-	_set_icon_visible(_hud_icon_rune2, show and _rune2_collected)
+	var st := _current_level_special_type()
+	_set_icon_visible(_hud_icon_codex, show and _codex_collected)
+	_set_icon_visible(_hud_icon_crown, show and _crown_collected)
+	_set_icon_visible(_hud_icon_rune1, show and _has_rune1())
+	_set_icon_visible(_hud_icon_rune2, show and _has_rune2())
 	_set_icon_visible(_hud_icon_torch, show and _torch_collected)
+	if _hud_icon_ring and RING_TEX:
+		_hud_icon_ring.texture = RING_TEX
+	_set_icon_visible(_hud_icon_ring, show and _ring_collected)
 	if _hud_score:
 		_hud_score.visible = show
 		_hud_score.text = "Score: %d" % _score
@@ -1580,8 +2183,11 @@ func _play_sfx(stream: AudioStream) -> void:
 
 func _set_level_item_textures() -> void:
 	# Adjust item visuals per level; fall back gracefully if assets are missing
-	var key_tex: Texture2D = KEY_TEX_1 if _level == 1 else KEY_TEX_2
-	var special_tex: Texture2D = CODEX_TEX if _level == 1 else CROWN_TEX
+	var key_tex: Texture2D = _key_texture_for_type(_current_key_type())
+	var st := _current_level_special_type()
+	var special_tex: Texture2D = CODEX_TEX
+	if st == &"crown":
+		special_tex = CROWN_TEX
 	if _key_node and _key_node.get_node_or_null("Sprite2D") is Sprite2D:
 		var s1 := _key_node.get_node("Sprite2D") as Sprite2D
 		s1.texture = key_tex if key_tex != null else s1.texture
@@ -1604,6 +2210,10 @@ func _set_level_item_textures() -> void:
 		_hud_icon_key1.texture = KEY_TEX_1
 	if _hud_icon_key2 and KEY_TEX_2:
 		_hud_icon_key2.texture = KEY_TEX_2
+	if _hud_icon_key3 and KEY_TEX_3:
+		_hud_icon_key3.texture = KEY_TEX_3
+	if _hud_icon_key3 and KEY_TEX_3:
+		_hud_icon_key3.texture = KEY_TEX_3
 	if _hud_icon_codex and CODEX_TEX:
 		_hud_icon_codex.texture = CODEX_TEX
 	if _hud_icon_crown and CROWN_TEX:
@@ -1618,6 +2228,8 @@ func _set_level_item_textures() -> void:
 		_hud_icon_rune2.texture = RUNE2_TEX
 	if _hud_icon_torch and TORCH_TEX:
 		_hud_icon_torch.texture = TORCH_TEX
+	if _hud_icon_ring and RING_TEX:
+		_hud_icon_ring.texture = RING_TEX
 
 func is_passable(cell: Vector2i) -> bool:
 	# Allow stepping onto the door cell only when it is actually open
@@ -1726,6 +2338,43 @@ func _setup_input() -> void:
 			var ev := InputEventKey.new()
 			ev.physical_keycode = key_code
 			InputMap.action_add_event(name, ev)
+
+func _prepare_run_layout() -> void:
+	_max_level = _rng.randi_range(3, 10)
+	_level_special_map.clear()
+	_special_levels.clear()
+	_level_key_map.clear()
+	_rune1_plan.clear()
+	_rune2_plan.clear()
+	var levels: Array[int] = []
+	for i in range(1, _max_level + 1):
+		levels.append(i)
+	levels.shuffle()
+	var specials: Array[StringName] = [&"codex", &"crown", &"ring"]
+	for s in specials:
+		if levels.is_empty():
+			break
+		var lvl: int = levels.pop_back()
+		_special_levels[s] = lvl
+		_level_special_map[lvl] = s
+	var key_levels: Array[int] = []
+	for i2 in range(1, _max_level + 1):
+		key_levels.append(i2)
+	key_levels.shuffle()
+	var key_types: Array[StringName] = [&"key1", &"key2", &"key3"]
+	for k in key_types:
+		if key_levels.is_empty():
+			break
+		var kl: int = key_levels.pop_back()
+		_level_key_map[kl] = k
+	var rune1_total: int = _rng.randi_range(1, 3)
+	var rune2_total: int = _rng.randi_range(1, 3)
+	for i3 in range(rune1_total):
+		var rl: int = _rng.randi_range(1, _max_level)
+		_rune1_plan[rl] = _rune1_plan.get(rl, 0) + 1
+	for i4 in range(rune2_total):
+		var rl2: int = _rng.randi_range(1, _max_level)
+		_rune2_plan[rl2] = _rune2_plan.get(rl2, 0) + 1
 
 func _get_enemy_at(cell: Vector2i) -> Enemy:
 	for g: Goblin in _goblins:

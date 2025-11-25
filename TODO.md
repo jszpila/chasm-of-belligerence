@@ -1,18 +1,18 @@
 # TODO
 
 - [x] Add score for killing enemies
-- [ ] More levels (min 3, max 10)
-    - [ ] Additional keys, special items  
-    - [ ] Each level probably doesn't need both; "open" levels would be ok
+- [x] More levels (min 3, max 10)
+    - [x] Additional keys, special items  
+    - [x] Each level probably doesn't need both; "open" levels would be ok
     - [ ] Randomize size
-    - [ ] How to scale, populate enemies?
+    - [x] How to scale, populate enemies?
 - [ ] Pick-up animation/splash  
 - [ ] Integrate additional wall/floor tiles sets.
     - [ ] Mix sets, or select one per level?   
 - [ ] Ranged weapon (wand? arrows?)  
 - [ ] Ranged enemy
 - [ ] Armor pick-up w/ meter
-- [ ] Basic XP system
+- [ ] Basic XP/leveling system based on score
 - [ ] Rune 3: increase max health
 - [ ] Health Potion: can pick up and use 1 if picked up at max HP  
 - [ ] Find and implement better font

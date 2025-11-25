@@ -43,6 +43,11 @@ format = 2
 [node name="Sprite2D" type="Sprite2D" parent="Door"]
 centered = false
 
+[node name="EntranceDoor" type="Node2D" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="EntranceDoor"]
+centered = false
+
 [node name="Player" parent="." instance=ExtResource("3")]
 
 [node name="PixelScaler" type="Node" parent="."]
@@ -99,6 +104,14 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("5")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HUDKey3Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
+visible = false
+custom_minimum_size = Vector2(36, 36)
+layout_mode = 2
+size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
 
@@ -162,6 +175,14 @@ custom_minimum_size = Vector2(36, 36)
 layout_mode = 2
 size_flags_vertical = 4
 texture = ExtResource("16")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HUDRingIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems"]
+visible = false
+custom_minimum_size = Vector2(36, 36)
+layout_mode = 2
+size_flags_vertical = 4
 expand_mode = 1
 stretch_mode = 5
 
