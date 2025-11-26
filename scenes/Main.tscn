@@ -367,7 +367,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("7")
-stretch_mode = 6
+stretch_mode = 5
+expand = true
 
 [node name="TitleLabel" type="Label" parent="Title"]
 z_index = 200
@@ -392,7 +393,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("8")
-stretch_mode = 6
+stretch_mode = 5
+expand = true
 
 [node name="OverBGLose" type="TextureRect" parent="GameOver"]
 visible = false
@@ -402,7 +404,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("9")
-stretch_mode = 6
+stretch_mode = 5
+expand = true
 
 [node name="OverLabel" type="Label" parent="GameOver"]
 z_index = 200

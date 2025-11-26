@@ -11,19 +11,33 @@ html, body, #canvas {
 	border: 0;
 }
 
+:root {
+	--game-max-width: 1152px;
+	--game-aspect-ratio: 1152 / 768;
+	--page-margin: 16px;
+}
+
 html, body { margin: 0; background: #000; color: #ddd; font-family: system-ui, sans-serif; }
-.game-wrap { width: 1536px; margin: 16px auto; text-align: center; }
-#canvas { display: block; width: 1536px; height: 1024px; margin: 0 auto;}
+.game-wrap {
+	max-width: var(--game-max-width);
+	width: calc(100vw - (var(--page-margin) * 2));
+	margin: var(--page-margin) auto;
+	text-align: center;
+}
+#canvas {
+	display: block;
+	width: 100%;
+	max-width: var(--game-max-width);
+	aspect-ratio: var(--game-aspect-ratio);
+	height: auto;
+	margin: 0 auto;
+}
 .instructions { margin: 0 auto;}
 body {
 	color: white;
 	background-color: black;
 	background-image: url('cob-bg.jpg');
 	background-size: cover;
-}
-
-#canvas {
-	display: block;
 }
 
 #canvas:focus {
@@ -103,6 +117,7 @@ body {
 }
 
 .text-content h1 {
+	margin-top: 0;
 	text-align: center;
 }
 
@@ -186,7 +201,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":1,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":10369860,"index.wasm":36145869},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":1,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":10207444,"index.wasm":36145869},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 

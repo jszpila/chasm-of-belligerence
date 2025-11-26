@@ -1,6 +1,6 @@
 extends Node
 
-const BASE_SIZE := Vector2i(1536, 1024)
+const BASE_SIZE := Vector2i(1152, 768)
 
 func _ready() -> void:
 	var win := get_window()

@@ -358,6 +358,9 @@ func _ready() -> void:
 	_build_tileset_from_sheet()
 	_rng.randomize()
 	_level_builder = LevelBuilder.new(_rng)
+	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
+		get_viewport().size_changed.connect(_on_viewport_resized)
+	_resize_fullscreen_art()
 	# Start at title screen
 	_state = STATE_TITLE
 	_show_title(true)
@@ -1818,7 +1821,7 @@ func _show_title(visible: bool) -> void:
 	_title_layer.visible = visible
 	_over_layer.visible = false
 	_title_label.add_theme_font_size_override("font_size", 64)
-	_title_label.offset_top = 512.0
+	_title_label.offset_top = get_viewport_rect().size.y * 0.5
 
 func _show_game_over(won: bool) -> void:
 	_over_layer.visible = true
@@ -1828,8 +1831,22 @@ func _show_game_over(won: bool) -> void:
 	_over_label.text = "Press Enter to restart"
 	if _over_score:
 		_over_score.add_theme_font_size_override("font_size", 36)
-		_over_score.offset_top = -124.0
+		_over_score.offset_top = -get_viewport_rect().size.y * 0.12
 		_over_score.text = "Score: %d" % _score
+
+func _on_viewport_resized() -> void:
+	_resize_fullscreen_art()
+
+func _resize_fullscreen_art() -> void:
+	var viewport_size := get_viewport_rect().size
+	for rect in [_title_bg, _over_bg_win, _over_bg_lose]:
+		if rect:
+			rect.size = viewport_size
+			rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+			rect.expand = true
+	_title_label.offset_top = viewport_size.y * 0.5
+	if _over_score:
+		_over_score.offset_top = -viewport_size.y * 0.12
 
 func _set_world_visible(visible: bool) -> void:
 	floor_map.visible = visible
