@@ -80,7 +80,9 @@ var RING_TEX: Texture2D
 var ARMOR_ICON_TEX: Texture2D
 var TRAP_TEX_A: Texture2D
 var TRAP_TEX_B: Texture2D
+var TRAP_WEB_TEX: Texture2D
 var BONE_TEXTURES: Array[Texture2D] = []
+var SPIDERWEB_TEXTURES := {}
 var FLOOR_TEXTURES: Array[Texture2D] = []
 var WALL_TEXTURES: Array[Texture2D] = []
 var _sheet_image: Image
@@ -212,11 +214,18 @@ func _load_spritesheet_textures() -> void:
 	ARMOR_ICON_TEX = _sheet_tex(&"armor_icon", Vector2i(338, 156), true)
 	TRAP_TEX_A = _sheet_tex(&"trap_a", Vector2i(364, 273), true)
 	TRAP_TEX_B = _sheet_tex(&"trap_b", Vector2i(390, 273), true)
+	TRAP_WEB_TEX = _sheet_tex(&"trap_web", Vector2i(52, 507), true)
 	BONE_TEXTURES = [
 		_sheet_tex(&"bone1", Vector2i(0, 494), true),
 		_sheet_tex(&"bone2", Vector2i(13, 494), true),
 		_sheet_tex(&"bone3", Vector2i(26, 494), true),
 	]
+	SPIDERWEB_TEXTURES = {
+		&"top_left": _sheet_tex(&"spiderweb_top_left", Vector2i(0, 507), true),
+		&"top_right": _sheet_tex(&"spiderweb_top_right", Vector2i(13, 507), true),
+		&"bottom_left": _sheet_tex(&"spiderweb_bottom_left", Vector2i(26, 507), true),
+		&"bottom_right": _sheet_tex(&"spiderweb_bottom_right", Vector2i(39, 507), true),
+	}
 	FLOOR_TEXTURES = [
 		_sheet_tex(&"floor1", Vector2i(130, 65), false),
 		_sheet_tex(&"floor2", Vector2i(143, 65), false),
@@ -322,6 +331,7 @@ var _torch_target_level: int = 1
 var _last_trap_cell: Vector2i = Vector2i(-1, -1)
 var _bone_cells := {}
 var _bone_spawn_outcomes := {}
+var _web_stuck_turns: int = 0
 var _level_special_map := {} # level -> special type
 var _special_levels := {} # special type -> level
 var _level_key_map := {} # level -> key type
@@ -499,9 +509,8 @@ func _process(_delta: float) -> void:
 		else:
 			var trap := _trap_at(cp)
 			if trap != null:
-				if cp != _last_trap_cell:
-					_apply_trap_damage()
-					_last_trap_cell = cp
+				if trap.trap_type == &"spiderweb" or cp != _last_trap_cell:
+					_handle_trap_trigger(trap, cp)
 			else:
 				_last_trap_cell = Vector2i(-1, -1)
 		# Rune pickups: rune-1 (+1 attack) and rune-2 (+1 defense i.e., -1 goblin roll)
@@ -555,6 +564,18 @@ func _process(_delta: float) -> void:
 func _on_player_moved(new_cell: Vector2i) -> void:
 	var skeleton_count_before := _skeletons.size()
 	_maybe_spawn_skeleton_from_bones(new_cell)
+	_advance_enemies_and_update(skeleton_count_before)
+	# Ensure item pickups trigger reliably on the exact moved cell (especially potions)
+	_pickup_potion_if_available(new_cell)
+
+func _on_player_attempt_move() -> bool:
+	if _web_stuck_turns > 0:
+		_web_stuck_turns = max(0, _web_stuck_turns - 1)
+		_advance_enemies_and_update(_skeletons.size())
+		return false
+	return true
+
+func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
 	# 75% chance each goblin attempts to move 1 step in a random dir
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	for goblin: Goblin in _goblins:
@@ -571,7 +592,7 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 			_move_homing_enemy(zombie)
 	for i in range(_skeletons.size()):
 		var skeleton := _skeletons[i]
-		if i >= skeleton_count_before:
+		if i >= skip_skeletons_from:
 			continue
 		if skeleton.alive:
 			_move_homing_enemy(skeleton)
@@ -580,8 +601,6 @@ func _on_player_moved(new_cell: Vector2i) -> void:
 		if mino.alive:
 			_move_homing_enemy(mino)
 	_update_fov()
-	# Ensure item pickups trigger reliably on the exact moved cell (especially potions)
-	_pickup_potion_if_available(new_cell)
 
 func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
 	var dest: Vector2i = goblin.grid_cell + dir
@@ -595,7 +614,7 @@ func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
 	goblin.set_cell(dest)
 	var trap := _trap_at(dest)
 	if trap != null:
-		_handle_enemy_hit_by_trap(goblin)
+		_handle_enemy_hit_by_trap(goblin, trap)
 
 func _move_mouse(mouse: Mouse, dir: Vector2i) -> void:
 	var dest: Vector2i = mouse.grid_cell + dir
@@ -652,7 +671,7 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 	if dest == player_cell and not _game_over:
 		var trap := _trap_at(dest)
 		if trap != null:
-			_handle_enemy_hit_by_trap(enemy)
+			_handle_enemy_hit_by_trap(enemy, trap)
 			return
 		_combat_round_enemy(enemy)
 		return
@@ -660,7 +679,7 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 	enemy.set_cell(dest)
 	var trap2 := _trap_at(dest)
 	if trap2 != null:
-		_handle_enemy_hit_by_trap(enemy)
+		_handle_enemy_hit_by_trap(enemy, trap2)
 
 
 func _get_grid_size() -> Vector2i:
@@ -1036,6 +1055,7 @@ func _restart_game() -> void:
 	_rune3_cells.clear()
 	_armor_cells.clear()
 	_last_trap_cell = Vector2i(-1, -1)
+	_web_stuck_turns = 0
 	_clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
@@ -1053,6 +1073,7 @@ func _restart_game() -> void:
 	_set_level_item_textures()
 	_clear_bones()
 	_place_bones(grid_size)
+	_place_spiderwebs(grid_size)
 	_place_door(grid_size)
 	_update_fov()
 	# Show entities
@@ -1118,7 +1139,7 @@ func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 	# Trap collision check before combat
 	var trap := _trap_at(enemy.grid_cell)
 	if trap != null:
-		_handle_enemy_hit_by_trap(enemy)
+		_handle_enemy_hit_by_trap(enemy, trap)
 		if not enemy.alive:
 			return
 	while true:
@@ -1475,7 +1496,7 @@ func _save_level_state(level: int) -> void:
 		})
 	var traps: Array = []
 	for t in _traps:
-		traps.append({"cell": t.grid_cell})
+		traps.append({"cell": t.grid_cell, "type": t.trap_type})
 	var mice: Array = []
 	for m2 in _mice:
 		mice.append({
@@ -1634,7 +1655,8 @@ func _restore_entities_from_state(level: int) -> void:
 	var traps: Array = state.get("traps", [])
 	for t in traps:
 		var tcell: Vector2i = t.get("cell", Vector2i.ZERO)
-		_spawn_trap_at(tcell)
+		var ttype: StringName = StringName(t.get("type", "spike"))
+		_spawn_trap_at(tcell, ttype)
 	var mice: Array = state.get("mice", [])
 	for m in mice:
 		var mcell: Vector2i = m.get("cell", Vector2i.ZERO)
@@ -1714,6 +1736,7 @@ func _start_game() -> void:
 	_torch_target_level = _rng.randi_range(1, _max_level)
 	_score = 0
 	_last_trap_cell = Vector2i(-1, -1)
+	_web_stuck_turns = 0
 	_update_hud_icons()
 	_clear_enemies()
 	_clear_runes()
@@ -1731,6 +1754,7 @@ func _start_game() -> void:
 	_set_level_item_textures()
 	_clear_bones()
 	_place_bones(grid_size)
+	_place_spiderwebs(grid_size)
 	_place_door(grid_size)
 	_update_fov()
 	# Enable controls
@@ -1929,10 +1953,18 @@ func _spawn_mouse_at(cell: Vector2i) -> void:
 	add_child(node)
 	_mice.append(node)
 
-func _spawn_trap_at(cell: Vector2i) -> void:
+func _spawn_trap_at(cell: Vector2i, trap_type: StringName = StringName()) -> void:
 	var node: Trap = TRAP_SCENE.instantiate() as Trap
-	var tex := (TRAP_TEX_A if _rng.randf() < 0.5 else TRAP_TEX_B)
-	node.setup(cell, tex)
+	var resolved_type := trap_type
+	if resolved_type == StringName():
+		var is_web := _rng.randf() < 0.33 and TRAP_WEB_TEX != null
+		resolved_type = (&"spiderweb" if is_web else &"spike")
+	var tex: Texture2D = null
+	if resolved_type == &"spiderweb":
+		tex = TRAP_WEB_TEX
+	else:
+		tex = (TRAP_TEX_A if _rng.randf() < 0.5 else TRAP_TEX_B)
+	node.setup(cell, tex, resolved_type)
 	add_child(node)
 	_traps.append(node)
 
@@ -2077,6 +2109,52 @@ func _place_bones(grid_size: Vector2i) -> void:
 			used[key] = true
 			break
 
+func _place_spiderwebs(grid_size: Vector2i) -> void:
+	var corner_defs := [
+		{ "name": &"top_left", "dirs": [Vector2i.UP, Vector2i.LEFT] },
+		{ "name": &"top_right", "dirs": [Vector2i.UP, Vector2i.RIGHT] },
+		{ "name": &"bottom_left", "dirs": [Vector2i.DOWN, Vector2i.RIGHT] },
+		{ "name": &"bottom_right", "dirs": [Vector2i.DOWN, Vector2i.LEFT] },
+	]
+	var used := {}
+	var player_cell := Grid.world_to_cell(player.global_position)
+	for corner in corner_defs:
+		var candidates: Array[Vector2i] = []
+		var dirs: Array = corner["dirs"]
+		for y in range(1, grid_size.y - 1):
+			for x in range(1, grid_size.x - 1):
+				var c := Vector2i(x, y)
+				var key := "%d,%d" % [c.x, c.y]
+				if used.has(key):
+					continue
+				if not _is_free(c):
+					continue
+				if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _potion2_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _armor_cells.has(c):
+					continue
+				if _bone_cells.has(c):
+					continue
+				var dir1: Vector2i = dirs[0]
+				var dir2: Vector2i = dirs[1]
+				if _is_wall(c + dir1) and _is_wall(c + dir2):
+					candidates.append(c)
+		if candidates.is_empty():
+			continue
+		candidates.shuffle()
+		var place_count: int = min(candidates.size(), _rng.randi_range(3, 12))
+		for i in range(place_count):
+			var cell: Vector2i = candidates[i]
+			var key2 := "%d,%d" % [cell.x, cell.y]
+			used[key2] = true
+			var s := Sprite2D.new()
+			var tex: Texture2D = SPIDERWEB_TEXTURES.get(corner["name"], null)
+			if tex == null:
+				continue
+			s.texture = tex
+			s.centered = false
+			s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			s.global_position = Grid.cell_to_world(cell)
+			_decor.add_child(s)
+
 func _maybe_spawn_skeleton_from_bones(cell: Vector2i) -> void:
 	if _level <= 1:
 		return
@@ -2198,6 +2276,8 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	_key_collected = false
 	_key_on_level = false
 	_door_is_open = false
+	_last_trap_cell = Vector2i(-1, -1)
+	_web_stuck_turns = 0
 	_clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
@@ -2345,8 +2425,22 @@ func _apply_trap_damage() -> void:
 		return
 	_apply_player_damage(1)
 
-func _handle_enemy_hit_by_trap(enemy: Enemy) -> void:
+func _handle_trap_trigger(trap: Trap, cell: Vector2i) -> void:
+	if trap == null:
+		return
+	if trap.trap_type == &"spiderweb":
+		_web_stuck_turns = _rng.randi_range(1, 3)
+		_traps.erase(trap)
+		trap.queue_free()
+		_last_trap_cell = Vector2i(-1, -1)
+		return
+	_apply_trap_damage()
+	_last_trap_cell = cell
+
+func _handle_enemy_hit_by_trap(enemy: Enemy, trap: Trap) -> void:
 	if enemy == null or not enemy.alive:
+		return
+	if trap.trap_type == &"spiderweb":
 		return
 	enemy.apply_damage(1)
 	if not enemy.alive:

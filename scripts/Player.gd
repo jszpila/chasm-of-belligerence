@@ -55,9 +55,14 @@ func _process(delta: float) -> void:
 
 func _try_move(delta_cell: Vector2i) -> void:
 	var dest := _grid_pos + delta_cell
+	var parent := get_parent()
+	if parent and parent.has_method("_on_player_attempt_move"):
+		var can_move: bool = parent._on_player_attempt_move()
+		if not can_move:
+			_end_turn()
+			return
 	if _is_blocked(dest):
 		return
-	var parent := get_parent()
 	if parent and parent.has_method("_get_enemy_at") and parent.has_method("_combat_round_enemy"):
 		var enemy: Enemy = parent._get_enemy_at(dest)
 		if enemy != null:
