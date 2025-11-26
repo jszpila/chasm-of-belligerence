@@ -120,6 +120,7 @@ var _debug_wand_outline: Line2D
 var _projectile_pool: Array[Line2D] = []
 var _projectile_active: Array[Line2D] = []
 var _title_textures: Array[Texture2D] = []
+@onready var _loading_label: Label = $HUD/LoadingLabel
 
 @onready var floor_map: TileMap = $Floor
 @onready var walls_map: TileMap = $Walls
@@ -514,9 +515,9 @@ func _ready() -> void:
 	_ranged_inactive.border_width_left = 1
 	_ranged_inactive.border_width_right = 1
 	if _hud_bow_panel:
-		_hud_bow_panel.add_theme_stylebox_override("panel", null)
+		_hud_bow_panel.add_theme_stylebox_override("panel", _ranged_inactive)
 	if _hud_wand_panel:
-		_hud_wand_panel.add_theme_stylebox_override("panel", null)
+		_hud_wand_panel.add_theme_stylebox_override("panel", _ranged_inactive)
 	_clear_debug_outlines()
 	_level_builder = LevelBuilder.new(_rng)
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
@@ -542,6 +543,17 @@ func _ready() -> void:
 			get_tree().root.size_changed.connect(_update_fade_rect)
 	_update_hud_icons()
 	print("Main scene ready 🚀")
+
+func _show_loading(text: String = "Loading...") -> void:
+	if _loading_label:
+		_loading_label.text = text
+		_loading_label.visible = true
+		_loading_label.z_index = 10000
+		_loading_label.z_as_relative = false
+
+func _hide_loading() -> void:
+	if _loading_label:
+		_loading_label.visible = false
 
 func _process(_delta: float) -> void:
 	# Title state: wait for Enter to start
@@ -1318,7 +1330,10 @@ func _restart_game() -> void:
 	if _is_transitioning:
 		return
 	_is_transitioning = true
+	_show_loading("Loading...")
+	await get_tree().process_frame
 	await _fade_to(level_fade_alpha, level_fade_out_time)
+	_hide_loading()
 	# Reset flags
 	_game_over = false
 	_key_collected = false
@@ -1520,7 +1535,7 @@ func _update_fade_rect() -> void:
 	if _fade == null:
 		return
 	_fade.position = Vector2.ZERO
-	_fade.size = get_viewport_rect().size
+	_fade.call_deferred("set_size", get_viewport_rect().size)
 
 func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 	if _game_over or enemy == null or not enemy.alive:
@@ -1863,6 +1878,7 @@ func _save_level_state(level: int) -> void:
 	state["potion_collected"] = _potion_collected
 	state["potion2_cell"] = _potion2_cell
 	state["potion2_collected"] = _potion2_collected
+	state["carried_potion"] = _carried_potion
 	state["wand_cell"] = _wand_cell
 	state["wand_collected"] = _wand_collected
 	state["bow_cell"] = _bow_cell
@@ -1985,6 +2001,7 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	_potion_collected = state.get("potion_collected", _potion_collected)
 	_potion2_cell = state.get("potion2_cell", _potion2_cell)
 	_potion2_collected = state.get("potion2_collected", _potion2_collected)
+	_carried_potion = state.get("carried_potion", _carried_potion)
 	_wand_cell = state.get("wand_cell", _wand_cell)
 	_wand_collected = state.get("wand_collected", _wand_collected)
 	_bow_cell = state.get("bow_cell", _bow_cell)
@@ -2138,6 +2155,8 @@ func _start_game() -> void:
 	_title_layer.visible = false
 	_over_layer.visible = false
 	_fade.modulate.a = 0.0
+	_show_loading("Loading...")
+	await get_tree().process_frame
 	# Reset flags/state
 	_state = STATE_PLAYING
 	_is_transitioning = false
@@ -2226,10 +2245,12 @@ func _start_game() -> void:
 	if player.has_signal("moved") and not player.moved.is_connected(_on_player_moved):
 		player.moved.connect(_on_player_moved)
 	_play_sfx(SFX_START)
+	_hide_loading()
 
 func _show_title(visible: bool) -> void:
 	_title_layer.visible = visible
 	_over_layer.visible = false
+	_hide_loading()
 	if visible and _title_bg and not _title_textures.is_empty():
 		var pick := _rng.randi_range(0, _title_textures.size() - 1)
 		var tex: Texture2D = _title_textures[pick]
@@ -2242,6 +2263,7 @@ func _show_game_over(won: bool) -> void:
 	_over_layer.visible = true
 	_over_bg_win.visible = won
 	_over_bg_lose.visible = not won
+	_hide_loading()
 	_over_label.add_theme_font_size_override("font_size", 48)
 	_over_label.text = "Press Enter to restart"
 	if _over_score:
@@ -2256,7 +2278,7 @@ func _resize_fullscreen_art() -> void:
 	var viewport_size := get_viewport_rect().size
 	for rect in [_title_bg, _over_bg_win, _over_bg_lose]:
 		if rect:
-			rect.size = viewport_size
+			rect.call_deferred("set_size", viewport_size)
 			rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 			rect.expand = true
 	_title_label.offset_top = viewport_size.y * 0.5
@@ -2588,6 +2610,8 @@ func _reset_items_visibility() -> void:
 		if anode:
 			anode.collected = anode.collected
 			anode.visible = not anode.collected and _arrow_cells.has(anode.grid_cell)
+	if _hud_icon_potion:
+		_set_icon_visible(_hud_icon_potion, _carried_potion)
 
 func _clear_bones() -> void:
 	for bone in _bone_cells.values():
@@ -2830,6 +2854,8 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	if _is_transitioning:
 		return
 	_is_transitioning = true
+	_show_loading("Loading...")
+	await get_tree().process_frame
 	_save_level_state(_level)
 	if player.has_method("set_control_enabled"):
 		player.set_control_enabled(false)
@@ -2890,6 +2916,7 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 		player.set_control_enabled(true)
 	_is_transitioning = false
 	_exit_rearm = false
+	_hide_loading()
 
 func _load_next_level() -> void:
 	_travel_to_level(_level + 1, true)
