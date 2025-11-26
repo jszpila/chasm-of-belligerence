@@ -81,6 +81,7 @@ var ARMOR_ICON_TEX: Texture2D
 var TRAP_TEX_A: Texture2D
 var TRAP_TEX_B: Texture2D
 var TRAP_WEB_TEX: Texture2D
+var BRAZIER_TEX: Texture2D
 var BONE_TEXTURES: Array[Texture2D] = []
 var SPIDERWEB_TEXTURES := {}
 var FLOOR_TEXTURES: Array[Texture2D] = []
@@ -215,6 +216,7 @@ func _load_spritesheet_textures() -> void:
 	TRAP_TEX_A = _sheet_tex(&"trap_a", Vector2i(364, 273), true)
 	TRAP_TEX_B = _sheet_tex(&"trap_b", Vector2i(390, 273), true)
 	TRAP_WEB_TEX = _sheet_tex(&"trap_web", Vector2i(52, 507), true)
+	BRAZIER_TEX = _sheet_tex(&"brazier", Vector2i(351, 286), true)
 	BONE_TEXTURES = [
 		_sheet_tex(&"bone1", Vector2i(0, 494), true),
 		_sheet_tex(&"bone2", Vector2i(13, 494), true),
@@ -332,6 +334,9 @@ var _last_trap_cell: Vector2i = Vector2i(-1, -1)
 var _bone_cells := {}
 var _bone_spawn_outcomes := {}
 var _web_stuck_turns: int = 0
+var _spiderweb_nodes: Array[Sprite2D] = []
+var _brazier_cells: Array[Vector2i] = []
+var _brazier_nodes: Array[Node2D] = []
 var _level_special_map := {} # level -> special type
 var _special_levels := {} # special type -> level
 var _level_key_map := {} # level -> key type
@@ -799,6 +804,27 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		_potion2_collected = true
 		if _potion2_node:
 			_potion2_node.visible = false
+	# Place braziers as decor (same count logic as potions)
+	_clear_braziers()
+	var brazier_count := _rng.randi_range(0, 2)
+	if brazier_count > 0:
+		var b_exclude: Array[Vector2i] = [
+			player_cell,
+			_key_cell,
+			_sword_cell,
+			_shield_cell
+		]
+		if _potion_cell != Vector2i(-1, -1):
+			b_exclude.append(_potion_cell)
+		if _potion2_cell != Vector2i(-1, -1):
+			b_exclude.append(_potion2_cell)
+		for i_b in range(brazier_count):
+			var b_cell := _level_builder.pick_free_interior_cell(grid_size, b_exclude, is_free, has_free_neighbor)
+			b_exclude.append(b_cell)
+			_brazier_cells.append(b_cell)
+			_spawn_brazier(b_cell)
+	else:
+		_brazier_cells.clear()
 	# Place special (codex/crown/ring) avoiding potions
 	var special_type := _current_level_special_type()
 	var special_exclude: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell]
@@ -840,6 +866,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		base_exclude.append(_potion_cell)
 	if _potion2_cell != Vector2i(-1, -1):
 		base_exclude.append(_potion2_cell)
+	if _brazier_cells.size() > 0:
+		base_exclude.append_array(_brazier_cells)
 	if _codex_cell != Vector2i.ZERO:
 		base_exclude.append(_codex_cell)
 	if special_type == &"ring" and _ring_cell != Vector2i.ZERO:
@@ -1056,6 +1084,8 @@ func _restart_game() -> void:
 	_armor_cells.clear()
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
+	_brazier_cells.clear()
+	_clear_braziers()
 	_clear_enemies()
 	_clear_runes()
 	_clear_armor_items()
@@ -1439,6 +1469,7 @@ func _save_level_state(level: int) -> void:
 	state["potion_collected"] = _potion_collected
 	state["potion2_cell"] = _potion2_cell
 	state["potion2_collected"] = _potion2_collected
+	state["braziers"] = _brazier_cells.duplicate()
 	state["armor_cells"] = []
 	state["codex_cell"] = _codex_cell
 	state["codex_collected"] = _codex_collected
@@ -1555,6 +1586,7 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	_potion_collected = state.get("potion_collected", _potion_collected)
 	_potion2_cell = state.get("potion2_cell", _potion2_cell)
 	_potion2_collected = state.get("potion2_collected", _potion2_collected)
+	_brazier_cells = state.get("braziers", [])
 	var armor_state: Array = state.get("armor_cells", [])
 	_codex_cell = state.get("codex_cell", _codex_cell)
 	_codex_collected = state.get("codex_collected", _codex_collected)
@@ -1657,6 +1689,9 @@ func _restore_entities_from_state(level: int) -> void:
 		var tcell: Vector2i = t.get("cell", Vector2i.ZERO)
 		var ttype: StringName = StringName(t.get("type", "spike"))
 		_spawn_trap_at(tcell, ttype)
+	_clear_braziers()
+	for bc in _brazier_cells:
+		_spawn_brazier(bc)
 	var mice: Array = state.get("mice", [])
 	for m in mice:
 		var mcell: Vector2i = m.get("cell", Vector2i.ZERO)
@@ -1737,6 +1772,8 @@ func _start_game() -> void:
 	_score = 0
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
+	_brazier_cells.clear()
+	_clear_braziers()
 	_update_hud_icons()
 	_clear_enemies()
 	_clear_runes()
@@ -1873,11 +1910,18 @@ func _update_fov() -> void:
 		_fov_dist[i] = 1e9
 	var center: Vector2i = Grid.world_to_cell(player.global_position)
 	var bonus: int = (4 if _torch_collected else 0)
-	var radius: int = SIGHT_OUTER_TILES + bonus
-	if _in_bounds(center):
-		var center_idx: int = center.y * _grid_size.x + center.x
-		_fov_visible[center_idx] = true
-		_fov_dist[center_idx] = 0.0
+	_apply_light_source(center, SIGHT_OUTER_TILES + bonus)
+	for bc in _brazier_cells:
+		_apply_light_source(bc, 3)
+	if _fov_overlay:
+		(_fov_overlay as Node).call_deferred("update_fov", _fov_visible, _fov_dist, SIGHT_INNER_TILES + bonus, SIGHT_OUTER_TILES + bonus, SIGHT_MAX_DARK)
+
+func _apply_light_source(center: Vector2i, radius: int) -> void:
+	if not _in_bounds(center):
+		return
+	var center_idx: int = center.y * _grid_size.x + center.x
+	_fov_visible[center_idx] = true
+	_fov_dist[center_idx] = min(_fov_dist[center_idx], 0.0)
 	var xmin: int = max(0, center.x - radius)
 	var xmax: int = min(_grid_size.x - 1, center.x + radius)
 	var ymin: int = max(0, center.y - radius)
@@ -1898,8 +1942,6 @@ func _update_fov() -> void:
 				_fov_dist[i] = min(_fov_dist[i], dist)
 				if _is_wall(p) and p != center:
 					break
-	if _fov_overlay:
-		(_fov_overlay as Node).call_deferred("update_fov", _fov_visible, _fov_dist, SIGHT_INNER_TILES + bonus, SIGHT_OUTER_TILES + bonus, SIGHT_MAX_DARK)
 
 func _in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < _grid_size.x and cell.y < _grid_size.y
@@ -2067,10 +2109,12 @@ func _reset_items_visibility() -> void:
 		_ring_node.visible = _current_level_special_type() == &"ring" and not _ring_collected
 
 func _clear_bones() -> void:
-	for child in _decor.get_children():
-		child.queue_free()
+	for bone in _bone_cells.values():
+		if bone:
+			bone.queue_free()
 	_bone_cells.clear()
 	_bone_spawn_outcomes.clear()
+	_clear_spiderwebs()
 
 func _place_bones(grid_size: Vector2i) -> void:
 	var count := _rng.randi_range(5, 30)
@@ -2109,7 +2153,41 @@ func _place_bones(grid_size: Vector2i) -> void:
 			used[key] = true
 			break
 
+func _clear_braziers() -> void:
+	for b in _brazier_nodes:
+		if b:
+			b.queue_free()
+	_brazier_nodes.clear()
+	_brazier_cells.clear()
+
+func _clear_spiderwebs() -> void:
+	for s in _spiderweb_nodes:
+		if s:
+			s.queue_free()
+	_spiderweb_nodes.clear()
+
+func _spawn_brazier(cell: Vector2i) -> void:
+	if BRAZIER_TEX == null or _decor == null:
+		return
+	var node := Node2D.new()
+	node.global_position = Grid.cell_to_world(cell)
+	var spr := Sprite2D.new()
+	spr.texture = BRAZIER_TEX
+	spr.centered = false
+	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	spr.z_index = 1
+	node.add_child(spr)
+	var light := PointLight2D.new()
+	light.position = Vector2(6, 6)
+	light.energy = 0.8
+	light.texture_scale = 0.35 # approximate 3 tiles of reach
+	light.shadow_enabled = false
+	node.add_child(light)
+	_decor.add_child(node)
+	_brazier_nodes.append(node)
+
 func _place_spiderwebs(grid_size: Vector2i) -> void:
+	_clear_spiderwebs()
 	var corner_defs := [
 		{ "name": &"top_left", "dirs": [Vector2i.UP, Vector2i.LEFT] },
 		{ "name": &"top_right", "dirs": [Vector2i.UP, Vector2i.RIGHT] },
@@ -2154,6 +2232,7 @@ func _place_spiderwebs(grid_size: Vector2i) -> void:
 			s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			s.global_position = Grid.cell_to_world(cell)
 			_decor.add_child(s)
+			_spiderweb_nodes.append(s)
 
 func _maybe_spawn_skeleton_from_bones(cell: Vector2i) -> void:
 	if _level <= 1:
@@ -2334,6 +2413,7 @@ func _load_next_level() -> void:
 func _update_player_sprite_appearance() -> void:
 	if _player_sprite == null:
 		return
+	_player_sprite.z_index = 5
 	var both := _sword_collected and _shield_collected
 	if both:
 		_player_sprite.texture = PLAYER_TEX_4
