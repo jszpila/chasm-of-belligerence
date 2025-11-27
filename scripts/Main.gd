@@ -3061,6 +3061,24 @@ func _try_use_potion() -> void:
 	_blink_node(player)
 
 func _ranged_dir_from_input() -> Vector2i:
+	# Allow combining held cardinals (e.g., J+I) to produce diagonals
+	var dir := Vector2i.ZERO
+	var triggered := false
+	if Input.is_action_pressed("ranged_dir_left"):
+		dir.x -= 1
+		triggered = triggered or Input.is_action_just_pressed("ranged_dir_left")
+	if Input.is_action_pressed("ranged_dir_right"):
+		dir.x += 1
+		triggered = triggered or Input.is_action_just_pressed("ranged_dir_right")
+	if Input.is_action_pressed("ranged_dir_up"):
+		dir.y -= 1
+		triggered = triggered or Input.is_action_just_pressed("ranged_dir_up")
+	if Input.is_action_pressed("ranged_dir_down"):
+		dir.y += 1
+		triggered = triggered or Input.is_action_just_pressed("ranged_dir_down")
+	if triggered and dir != Vector2i.ZERO:
+		return dir
+	# Fall back to direct directional actions (e.g., numpad diagonals)
 	var mapping: Array = [
 		["ranged_dir_up_left", Vector2i(-1, -1)],
 		["ranged_dir_up", Vector2i(0, -1)],
@@ -3073,9 +3091,9 @@ func _ranged_dir_from_input() -> Vector2i:
 	]
 	for pair in mapping:
 		var action: String = pair[0]
-		var dir: Vector2i = pair[1]
+		var dir2: Vector2i = pair[1]
 		if Input.is_action_just_pressed(action):
-			return dir
+			return dir2
 	return Vector2i.ZERO
 
 func _ensure_active_ranged_valid() -> void:
@@ -3535,14 +3553,14 @@ func _setup_input() -> void:
 		["start", [Key.KEY_ENTER]],
 		["use_potion", [Key.KEY_Q]],
 		["switch_ranged", [Key.KEY_R]],
-		["ranged_dir_up", [Key.KEY_KP_8]],
-		["ranged_dir_down", [Key.KEY_KP_2]],
-		["ranged_dir_left", [Key.KEY_KP_4]],
-		["ranged_dir_right", [Key.KEY_KP_6]],
-		["ranged_dir_up_left", [Key.KEY_KP_7]],
-		["ranged_dir_up_right", [Key.KEY_KP_9]],
-		["ranged_dir_down_left", [Key.KEY_KP_1]],
-		["ranged_dir_down_right", [Key.KEY_KP_3]],
+		["ranged_dir_up", [Key.KEY_KP_8, Key.KEY_I]],
+		["ranged_dir_down", [Key.KEY_KP_2, Key.KEY_K]],
+		["ranged_dir_left", [Key.KEY_KP_4, Key.KEY_J]],
+		["ranged_dir_right", [Key.KEY_KP_6, Key.KEY_L]],
+		["ranged_dir_up_left", [Key.KEY_KP_7, Key.KEY_U]],
+		["ranged_dir_up_right", [Key.KEY_KP_9, Key.KEY_O]],
+		["ranged_dir_down_left", [Key.KEY_KP_1, Key.KEY_N]],
+		["ranged_dir_down_right", [Key.KEY_KP_3, Key.KEY_PERIOD]],
 	]
 	for pair in mapping:
 		var name: String = pair[0]

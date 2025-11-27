@@ -55,6 +55,32 @@ func test_bresenham_line_continuity() -> void:
 		assert_true(abs(step.x) <= 1 and abs(step.y) <= 1, "Line steps should move at most 1 per axis (idx=%d)" % i)
 	main.queue_free()
 
+func test_ranged_dir_combined_keys_produces_diagonal() -> void:
+	var main: Node = _fresh_main()
+	var actions := [
+		"ranged_dir_left",
+		"ranged_dir_right",
+		"ranged_dir_up",
+		"ranged_dir_down",
+		"ranged_dir_up_left",
+		"ranged_dir_up_right",
+		"ranged_dir_down_left",
+		"ranged_dir_down_right",
+	]
+	for a in actions:
+		_ensure_action(a)
+	# Simulate holding left then pressing up to produce (-1,-1)
+	Input.action_press("ranged_dir_left")
+	Input.action_press("ranged_dir_up")
+	var dir: Vector2i = main._ranged_dir_from_input()
+	assert_eq(dir, Vector2i(-1, -1), "Combining left+up should yield a diagonal ranged dir")
+	Input.action_release("ranged_dir_left")
+	Input.action_release("ranged_dir_up")
+	for a2 in actions:
+		if InputMap.has_action(a2):
+			InputMap.erase_action(a2)
+	main.queue_free()
+
 func _make_tilemap_with_wall(cell: Vector2i) -> TileMap:
 	var tm := TileMap.new()
 	var ts := TileSet.new()
@@ -67,6 +93,10 @@ func _make_tilemap_with_wall(cell: Vector2i) -> TileMap:
 	tm.tile_set = ts
 	tm.set_cell(0, cell, 0, Vector2i.ZERO)
 	return tm
+
+func _ensure_action(name: String) -> void:
+	if not InputMap.has_action(name):
+		InputMap.add_action(name)
 
 func test_passability_checks_respect_walls_traps_enemies_mice() -> void:
 	var main: Node = _fresh_main()
