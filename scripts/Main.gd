@@ -120,6 +120,7 @@ var _debug_wand_outline: Line2D
 var _projectile_pool: Array[Line2D] = []
 var _projectile_active: Array[Line2D] = []
 var _title_textures: Array[Texture2D] = []
+var _audio_pool: Array[AudioStreamPlayer] = []
 @onready var _loading_label: Label = $HUD/LoadingLabel
 
 @onready var floor_map: TileMap = $Floor
@@ -451,6 +452,7 @@ var _minotaurs: Array[Minotaur] = []
 var _skeletons: Array[Skeleton] = []
 var _mice: Array[Mouse] = []
 var _traps: Array[Trap] = []
+var _enemy_map: Dictionary = {}
 var _potion2_node: Item
 var _arrow_nodes: Array[Item] = []
 var _armor_nodes: Array[Item] = []
@@ -822,7 +824,7 @@ func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
 	if dest == player_cell and goblin.alive and not _game_over:
 		_combat_round_enemy(goblin)
 		return
-	goblin.set_cell(dest)
+	_set_enemy_cell(goblin, dest)
 	var trap := _trap_at(dest)
 	if trap != null:
 		_handle_enemy_hit_by_trap(goblin, trap)
@@ -887,7 +889,7 @@ func _move_homing_enemy(enemy: Enemy) -> void:
 		_combat_round_enemy(enemy)
 		return
 	# Move
-	enemy.set_cell(dest)
+	_set_enemy_cell(enemy, dest)
 	var trap2 := _trap_at(dest)
 	if trap2 != null:
 		_handle_enemy_hit_by_trap(enemy, trap2)
@@ -1571,6 +1573,7 @@ func _handle_enemy_death(enemy: Enemy) -> void:
 	if enemy == null:
 		return
 	enemy.visible = false
+	_remove_enemy_from_map(enemy)
 	_leave_enemy_corpse(enemy)
 	_play_sfx(SFX_HURT3)
 	_add_score(_enemy_score_value(enemy))
@@ -2087,12 +2090,14 @@ func _restore_entities_from_state(level: int) -> void:
 			if not alive:
 				_goblins.back().alive = false
 				_goblins.back().visible = false
+				_remove_enemy_from_map(_goblins.back())
 		elif etype == "zombie":
 			var zcell := cell
 			_spawn_zombie_at(zcell)
 			if not alive:
 				_zombies.back().alive = false
 				_zombies.back().visible = false
+				_remove_enemy_from_map(_zombies.back())
 		elif etype == "minotaur":
 			var mcell := cell
 			_spawn_minotaur_at(mcell)
@@ -2100,6 +2105,7 @@ func _restore_entities_from_state(level: int) -> void:
 			if not alive:
 				_minotaurs.back().alive = false
 				_minotaurs.back().visible = false
+				_remove_enemy_from_map(_minotaurs.back())
 		elif etype == "skeleton":
 			var skcell := cell
 			_spawn_skeleton_at(skcell)
@@ -2107,6 +2113,7 @@ func _restore_entities_from_state(level: int) -> void:
 			if not alive:
 				_skeletons.back().alive = false
 				_skeletons.back().visible = false
+				_remove_enemy_from_map(_skeletons.back())
 	var traps: Array = state.get("traps", [])
 	for t in traps:
 		var tcell: Vector2i = t.get("cell", Vector2i.ZERO)
@@ -2364,10 +2371,9 @@ func _ensure_fov_overlay() -> void:
 	var total: int = _grid_size.x * _grid_size.y
 	_fov_visible.resize(total)
 	_fov_dist.resize(total)
-	for i in range(total):
-		_fov_visible[i] = false
-		_fov_dist[i] = 1e9
-		(_fov_overlay as Node).call("set_grid", _grid_size)
+	_fov_visible.fill(false)
+	_fov_dist.fill(1e9)
+	(_fov_overlay as Node).call("set_grid", _grid_size)
 	_update_fov()
 
 func _update_fov() -> void:
@@ -2377,9 +2383,8 @@ func _update_fov() -> void:
 	if _fov_visible.size() != total:
 		_fov_visible.resize(total)
 		_fov_dist.resize(total)
-	for i in range(total):
-		_fov_visible[i] = false
-		_fov_dist[i] = 1e9
+	_fov_visible.fill(false)
+	_fov_dist.fill(1e9)
 	var center: Vector2i = Grid.world_to_cell(player.global_position)
 	var bonus: int = (4 if _torch_collected else 0)
 	_apply_light_source(center, SIGHT_OUTER_TILES + bonus)
@@ -2399,21 +2404,23 @@ func _apply_light_source(center: Vector2i, radius: int) -> void:
 	var ymin: int = max(0, center.y - radius)
 	var ymax: int = min(_grid_size.y - 1, center.y + radius)
 	for y in range(ymin, ymax + 1):
-		for x in range(xmin, xmax + 1):
-			var c: Vector2i = Vector2i(x, y)
-			var dtiles: float = float(max(abs(c.x - center.x), abs(c.y - center.y)))
-			if dtiles > float(radius):
-				continue
-			var line: Array[Vector2i] = _bresenham(center, c)
-			for p in line:
-				if not _in_bounds(p):
-					break
-				var i: int = p.y * _grid_size.x + p.x
-				var dist: float = sqrt(pow(float(p.x - center.x), 2.0) + pow(float(p.y - center.y), 2.0))
-				_fov_visible[i] = true
-				_fov_dist[i] = min(_fov_dist[i], dist)
-				if _is_wall(p) and p != center:
-					break
+			for x in range(xmin, xmax + 1):
+				var c: Vector2i = Vector2i(x, y)
+				var dtiles: float = float(max(abs(c.x - center.x), abs(c.y - center.y)))
+				if dtiles > float(radius):
+					continue
+				var line: Array[Vector2i] = _bresenham(center, c)
+				for p in line:
+					if not _in_bounds(p):
+						break
+					var i: int = p.y * _grid_size.x + p.x
+					var dx: int = p.x - center.x
+					var dy: int = p.y - center.y
+					var dist: float = sqrt(float(dx * dx + dy * dy))
+					_fov_visible[i] = true
+					_fov_dist[i] = min(_fov_dist[i], dist)
+					if _is_wall(p) and p != center:
+						break
 
 func _in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < _grid_size.x and cell.y < _grid_size.y
@@ -2446,18 +2453,21 @@ func _spawn_goblin_at(cell: Vector2i) -> void:
 	var node: Goblin = GOBLIN_SCENE.instantiate() as Goblin
 	node.setup(cell, GOBLIN_TEX_1, DEAD_GOBLIN_TEX)
 	add_child(node)
+	_register_enemy(node)
 	_goblins.append(node)
 
 func _spawn_zombie_at(cell: Vector2i) -> void:
 	var node: Zombie = ZOMBIE_SCENE.instantiate() as Zombie
 	node.setup(cell, ZOMBIE_TEX_1, ZOMBIE_TEX_2)
 	add_child(node)
+	_register_enemy(node)
 	_zombies.append(node)
 
 func _spawn_minotaur_at(cell: Vector2i) -> void:
 	var node: Minotaur = MINOTAUR_SCENE.instantiate() as Minotaur
 	node.setup(cell, MINO_TEX_1, MINO_TEX_2)
 	add_child(node)
+	_register_enemy(node)
 	_minotaurs.append(node)
 
 func _spawn_mouse_at(cell: Vector2i) -> void:
@@ -2486,6 +2496,7 @@ func _spawn_skeleton_at(cell: Vector2i) -> void:
 	var node: Skeleton = SKELETON_SCENE.instantiate() as Skeleton
 	node.setup(cell, SKELETON_TEX_1, SKELETON_TEX_2)
 	add_child(node)
+	_register_enemy(node)
 	_skeletons.append(node)
 
 func _clear_enemies() -> void:
@@ -2501,6 +2512,7 @@ func _clear_enemies() -> void:
 	_zombies.clear()
 	_minotaurs.clear()
 	_skeletons.clear()
+	_enemy_map.clear()
 	_clear_mice()
 	_clear_traps()
 	_clear_corpses()
@@ -2620,7 +2632,6 @@ func _clear_bones() -> void:
 	_bone_cells.clear()
 	_bone_spawn_outcomes.clear()
 	_clear_spiderwebs()
-	_clear_corpses()
 	_clear_corpses()
 
 func _place_bones(grid_size: Vector2i) -> void:
@@ -3050,6 +3061,24 @@ func _try_use_potion() -> void:
 	_blink_node(player)
 
 func _ranged_dir_from_input() -> Vector2i:
+	# Allow combining held cardinals (e.g., J+I) to produce diagonals
+	var dir := Vector2i.ZERO
+	var triggered := false
+	if Input.is_action_pressed("ranged_dir_left"):
+		dir.x -= 1
+		triggered = triggered or Input.is_action_just_pressed("ranged_dir_left")
+	if Input.is_action_pressed("ranged_dir_right"):
+		dir.x += 1
+		triggered = triggered or Input.is_action_just_pressed("ranged_dir_right")
+	if Input.is_action_pressed("ranged_dir_up"):
+		dir.y -= 1
+		triggered = triggered or Input.is_action_just_pressed("ranged_dir_up")
+	if Input.is_action_pressed("ranged_dir_down"):
+		dir.y += 1
+		triggered = triggered or Input.is_action_just_pressed("ranged_dir_down")
+	if triggered and dir != Vector2i.ZERO:
+		return dir
+	# Fall back to direct directional actions (e.g., numpad diagonals)
 	var mapping: Array = [
 		["ranged_dir_up_left", Vector2i(-1, -1)],
 		["ranged_dir_up", Vector2i(0, -1)],
@@ -3062,9 +3091,9 @@ func _ranged_dir_from_input() -> Vector2i:
 	]
 	for pair in mapping:
 		var action: String = pair[0]
-		var dir: Vector2i = pair[1]
+		var dir2: Vector2i = pair[1]
 		if Input.is_action_just_pressed(action):
-			return dir
+			return dir2
 	return Vector2i.ZERO
 
 func _ensure_active_ranged_valid() -> void:
@@ -3282,6 +3311,7 @@ func _handle_enemy_hit_by_trap(enemy: Enemy, trap: Trap) -> void:
 	enemy.apply_damage(1)
 	if not enemy.alive:
 		enemy.visible = false
+		_remove_enemy_from_map(enemy)
 		_leave_enemy_corpse(enemy)
 
 func _update_hud_hearts() -> void:
@@ -3329,11 +3359,20 @@ func _blink_node_colored(ci: CanvasItem, color: Color) -> void:
 func _play_sfx(stream: AudioStream) -> void:
 	if stream == null:
 		return
+	var player := _get_audio_player()
+	if player == null:
+		return
+	player.stream = stream
+	player.play()
+
+func _get_audio_player() -> AudioStreamPlayer:
+	for p in _audio_pool:
+		if p != null and not p.playing:
+			return p
 	var p := AudioStreamPlayer.new()
-	p.stream = stream
 	add_child(p)
-	p.finished.connect(func(): p.queue_free())
-	p.play()
+	_audio_pool.append(p)
+	return p
 
 func _set_level_item_textures() -> void:
 	# Adjust item visuals per level; fall back gracefully if assets are missing
@@ -3514,14 +3553,14 @@ func _setup_input() -> void:
 		["start", [Key.KEY_ENTER]],
 		["use_potion", [Key.KEY_Q]],
 		["switch_ranged", [Key.KEY_R]],
-		["ranged_dir_up", [Key.KEY_KP_8]],
-		["ranged_dir_down", [Key.KEY_KP_2]],
-		["ranged_dir_left", [Key.KEY_KP_4]],
-		["ranged_dir_right", [Key.KEY_KP_6]],
-		["ranged_dir_up_left", [Key.KEY_KP_7]],
-		["ranged_dir_up_right", [Key.KEY_KP_9]],
-		["ranged_dir_down_left", [Key.KEY_KP_1]],
-		["ranged_dir_down_right", [Key.KEY_KP_3]],
+		["ranged_dir_up", [Key.KEY_KP_8, Key.KEY_I]],
+		["ranged_dir_down", [Key.KEY_KP_2, Key.KEY_K]],
+		["ranged_dir_left", [Key.KEY_KP_4, Key.KEY_J]],
+		["ranged_dir_right", [Key.KEY_KP_6, Key.KEY_L]],
+		["ranged_dir_up_left", [Key.KEY_KP_7, Key.KEY_U]],
+		["ranged_dir_up_right", [Key.KEY_KP_9, Key.KEY_O]],
+		["ranged_dir_down_left", [Key.KEY_KP_1, Key.KEY_N]],
+		["ranged_dir_down_right", [Key.KEY_KP_3, Key.KEY_PERIOD]],
 	]
 	for pair in mapping:
 		var name: String = pair[0]
@@ -3578,39 +3617,49 @@ func _prepare_run_layout() -> void:
 	for i4 in range(rune2_total):
 		var rl2: int = _rng.randi_range(1, _max_level)
 		_rune2_plan[rl2] = _rune2_plan.get(rl2, 0) + 1
-	for i5 in range(rune3_total):
-		var rl3: int = _rng.randi_range(1, _max_level)
-		_rune3_plan[rl3] = _rune3_plan.get(rl3, 0) + 1
-	var arrow_levels: Array[int] = []
-	for i6 in range(1, _max_level + 1):
-		arrow_levels.append(i6)
-	arrow_levels.shuffle()
-	var arrow_total: int = _rng.randi_range(1, min(3, _max_level))
-	for _i_arrow in range(arrow_total):
-		if arrow_levels.is_empty():
-			break
-		var al: int = arrow_levels.pop_back()
-		_arrow_plan[al] = 1
-	_wand_level = _rng.randi_range(1, _max_level)
-	_bow_level = _rng.randi_range(1, _max_level)
-	if DEBUG_FORCE_RANGED:
-		_wand_level = 1
-		_bow_level = 1
-		_arrow_plan[1] = 1
+		for i5 in range(rune3_total):
+			var rl3: int = _rng.randi_range(1, _max_level)
+			_rune3_plan[rl3] = _rune3_plan.get(rl3, 0) + 1
+		var arrow_levels: Array[int] = []
+		for i6 in range(1, _max_level + 1):
+			arrow_levels.append(i6)
+		arrow_levels.shuffle()
+		var arrow_total: int = _rng.randi_range(1, min(3, _max_level))
+		for _i_arrow in range(arrow_total):
+			if arrow_levels.is_empty():
+				break
+			var al: int = arrow_levels.pop_back()
+			_arrow_plan[al] = 1
+		_wand_level = _rng.randi_range(1, _max_level)
+		_bow_level = _rng.randi_range(1, _max_level)
+		if DEBUG_FORCE_RANGED:
+			_wand_level = 1
+			_bow_level = 1
+			_arrow_plan[1] = 1
+
+func _register_enemy(enemy: Enemy) -> void:
+	if enemy == null:
+		return
+	_enemy_map[enemy.grid_cell] = enemy
+
+func _set_enemy_cell(enemy: Enemy, cell: Vector2i) -> void:
+	if enemy == null:
+		return
+	if _enemy_map.get(enemy.grid_cell, null) == enemy:
+		_enemy_map.erase(enemy.grid_cell)
+	enemy.set_cell(cell)
+	_enemy_map[cell] = enemy
+
+func _remove_enemy_from_map(enemy: Enemy) -> void:
+	if enemy == null:
+		return
+	if _enemy_map.get(enemy.grid_cell, null) == enemy:
+		_enemy_map.erase(enemy.grid_cell)
 
 func _get_enemy_at(cell: Vector2i) -> Enemy:
-	for g: Goblin in _goblins:
-		if g.alive and g.grid_cell == cell:
-			return g
-	for z: Zombie in _zombies:
-		if z.alive and z.grid_cell == cell:
-			return z
-	for m: Minotaur in _minotaurs:
-		if m.alive and m.grid_cell == cell:
-			return m
-	for sk: Skeleton in _skeletons:
-		if sk.alive and sk.grid_cell == cell:
-			return sk
+	var enemy: Enemy = _enemy_map.get(cell, null)
+	if enemy != null and enemy is Enemy and enemy.alive:
+		return enemy
 	return null
 
 func _mouse_at(cell: Vector2i) -> Mouse:
