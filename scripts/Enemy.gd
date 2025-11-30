@@ -25,12 +25,19 @@ func set_cell(cell: Vector2i) -> void:
 func apply_damage(amount: int) -> bool:
 	if not alive:
 		return false
+	var prev_hp := hp
 	hp = max(0, hp - amount)
+	if hp < prev_hp:
+		_on_damaged(amount)
 	if hp <= 0:
 		alive = false
 		visible = false
 		return true
 	return false
+
+func _on_damaged(_amount: int) -> void:
+	# Overridden by specific enemies to react to damage (e.g., tint, particles).
+	pass
 
 func take_turn(player_cell: Vector2i, rng: RandomNumberGenerator, can_step: Callable) -> void:
 	# To be overridden per enemy type.
