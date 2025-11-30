@@ -145,3 +145,22 @@ func test_minotaur_tints_on_damage() -> void:
 	assert_true(took_damage == false, "First hit should not kill the minotaur")
 	assert_true(sprite.modulate != original, "Minotaur sprite should tint when damaged")
 	mino.queue_free()
+
+func test_final_door_fx_visibility() -> void:
+	var main: Node = _fresh_main()
+	main._door_node = Node2D.new()
+	var sprite := Sprite2D.new()
+	main._door_sprite = sprite
+	sprite.texture = ImageTexture.create_from_image(Image.create(1, 1, false, Image.FORMAT_RGBA8))
+	main._door_node.add_child(sprite)
+	main.add_child(main._door_node)
+	main._max_level = 3
+	main._level = 2
+	main._apply_final_door_fx()
+	assert_true(main._door_glow == null or main._door_glow.visible == false, "Glow should be absent/hidden before final level")
+	main._level = main._max_level
+	main._apply_final_door_fx()
+	assert_true(main._door_glow != null and main._door_glow.visible, "Glow should be visible on final level")
+	if main._door_glow:
+		main._door_glow.queue_free()
+	main.queue_free()

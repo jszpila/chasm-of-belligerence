@@ -61,6 +61,8 @@ const EARLY_LEVEL_WEIGHT := 3
 const ACTION_LOG_MAX := 5
 const ACTION_LOG_OPACITIES := [1.0, 0.8, 0.6, 0.4, 0.2]
 const ACTION_LOG_FONT_SIZE := 28
+const FINAL_DOOR_PULSE_SCALE := 0.06
+const FINAL_DOOR_PULSE_TIME := 0.6
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -488,6 +490,8 @@ var _spiderweb_nodes: Array[Sprite2D] = []
 var _corpse_nodes: Array[Sprite2D] = []
 var _brazier_cells: Array[Vector2i] = []
 var _brazier_nodes: Array[Node2D] = []
+var _door_glow: PointLight2D
+var _door_pulse_tween: Tween
 var _level_special_map := {} # level -> special type
 var _special_levels := {} # special type -> level
 var _level_key_map := {} # level -> key type
@@ -2073,6 +2077,7 @@ func _apply_restored_items() -> void:
 		_door_node.global_position = Grid.cell_to_world(_door_cell)
 	if _entrance_door_node:
 		_entrance_door_node.global_position = Grid.cell_to_world(_entrance_cell)
+	_apply_final_door_fx()
 
 func _save_level_state(level: int) -> void:
 	var state := {}
@@ -2573,6 +2578,7 @@ func _set_world_visible(visible: bool) -> void:
 		_door_node.visible = visible
 	if _entrance_door_node:
 		_entrance_door_node.visible = visible and _level > 1
+	_apply_final_door_fx()
 	_update_hud_icons()
 
 func _ensure_fov_overlay() -> void:
@@ -3053,6 +3059,7 @@ func _place_door(grid_size: Vector2i) -> void:
 		_door_cell = Vector2i(0, 0)
 	if _door_node:
 		_door_node.global_position = Grid.cell_to_world(_door_cell)
+	_apply_final_door_fx()
 	_update_door_texture()
 
 func _place_entrance_door(grid_size: Vector2i) -> void:
@@ -3080,7 +3087,40 @@ func _update_door_texture() -> void:
 	_door_is_open = open
 	if _entrance_door_sprite:
 		_entrance_door_sprite.texture = DOOR_TEX_3 if DOOR_TEX_3 != null else DOOR_TEX_2
+	_apply_final_door_fx()
 	print("[DEBUG] Door texture update: level=", _level, " key_on_level=", _key_on_level, " key_collected=", _key_collected, " open=", open, " door_cell=", _door_cell)
+
+func _stop_final_door_fx() -> void:
+	if _door_pulse_tween:
+		_door_pulse_tween.kill()
+		_door_pulse_tween = null
+	if _door_sprite:
+		_door_sprite.scale = Vector2.ONE
+	if _door_glow:
+		_door_glow.visible = false
+
+func _apply_final_door_fx() -> void:
+	if _door_sprite == null or _door_node == null:
+		return
+	var is_final := (_level >= _max_level)
+	if not is_final:
+		_stop_final_door_fx()
+		return
+	if _door_glow == null:
+		_door_glow = PointLight2D.new()
+		_door_glow.energy = 0.9
+		_door_glow.texture_scale = 0.35
+		_door_glow.color = Color(1, 0.85, 0.3, 0.8)
+		_door_glow.shadow_enabled = false
+		_door_node.add_child(_door_glow)
+		_door_glow.position = Vector2(6, 6)
+	_door_glow.visible = true
+	_stop_final_door_fx()
+	_door_pulse_tween = get_tree().create_tween()
+	_door_pulse_tween.set_loops()
+	var up_scale := Vector2(1.0 + FINAL_DOOR_PULSE_SCALE, 1.0 + FINAL_DOOR_PULSE_SCALE)
+	_door_pulse_tween.tween_property(_door_sprite, "scale", up_scale, FINAL_DOOR_PULSE_TIME).set_ease(Tween.EASE_IN_OUT)
+	_door_pulse_tween.tween_property(_door_sprite, "scale", Vector2.ONE, FINAL_DOOR_PULSE_TIME).set_ease(Tween.EASE_IN_OUT)
 
 func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	if _is_transitioning:
