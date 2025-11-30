@@ -1,3 +1,4 @@
+#!/usr/bin/env -S godot4 --headless --path . --script
 extends SceneTree
 
 # Lightweight test runner (no external deps). Run with:
@@ -35,23 +36,24 @@ func _test_grid_round_trip() -> void:
 	_assert_eq(back, cell, "Grid round-trip should return original cell")
 
 func _test_weighted_floor_sources() -> void:
-	var main_script := load("res://scripts/Main.gd")
-	var main := main_script.new()
-	var base := [1, 2]
-	var shared := [3]
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
+	var base: Array = [1, 2]
+	var shared: Array = [3]
 	var weighted: Array = main._build_weighted_floor_sources(base, shared, 0.25)
 	_assert_eq(weighted.size(), 100, "Weighted floor sources should have 100 buckets")
 	var shared_count := 0
 	for id in weighted:
 		if id == 3:
 			shared_count += 1
-	_assert_true(shared_count >= 20 and shared_count <= 30, "Shared bucket count should be near 25% (got %d)" % shared_count)
+	_assert_true(shared_count >= 20 and shared_count <= 30, "Shared bucket count should be near 25%% (got %d)" % shared_count)
+	main.queue_free()
 
 func _test_enemy_registry() -> void:
-	var main_script := load("res://scripts/Main.gd")
-	var goblin_script := load("res://scripts/Goblin.gd")
-	var main := main_script.new()
-	var goblin := goblin_script.new()
+	var main_script: Script = load("res://scripts/Main.gd")
+	var goblin_script: Script = load("res://scripts/Goblin.gd")
+	var main: Node = main_script.new()
+	var goblin: Node2D = goblin_script.new()
 	goblin.grid_cell = Vector2i(1, 1)
 	main._register_enemy(goblin)
 	_assert_eq(main._get_enemy_at(Vector2i(1, 1)), goblin, "Enemy should be retrievable after register")
@@ -60,13 +62,16 @@ func _test_enemy_registry() -> void:
 	_assert_eq(main._get_enemy_at(Vector2i(2, 2)), goblin, "Enemy should move in registry with set")
 	main._remove_enemy_from_map(goblin)
 	_assert_true(main._get_enemy_at(Vector2i(2, 2)) == null, "Enemy should be removed from registry")
+	goblin.queue_free()
+	main.queue_free()
 
 func _test_bresenham_line() -> void:
-	var main_script := load("res://scripts/Main.gd")
-	var main := main_script.new()
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
 	var pts: Array = main._bresenham(Vector2i.ZERO, Vector2i(3, 3))
 	_assert_eq(pts.front(), Vector2i.ZERO, "Bresenham should start at origin")
 	_assert_eq(pts.back(), Vector2i(3, 3), "Bresenham should end at destination")
 	for i in range(1, pts.size()):
-		var step := pts[i] - pts[i - 1]
+		var step: Vector2i = pts[i] - pts[i - 1]
 		_assert_true(abs(step.x) <= 1 and abs(step.y) <= 1, "Bresenham steps should move at most 1 per axis")
+	main.queue_free()

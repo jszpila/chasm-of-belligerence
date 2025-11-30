@@ -57,6 +57,7 @@ const ARROWS_PER_PICKUP := 3
 const SHARED_FLOOR_WEIGHT := 0.15
 const DEBUG_FORCE_RANGED := false
 const DEBUG_SPAWN_ALL_ITEMS := false
+const EARLY_LEVEL_WEIGHT := 3
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -3750,6 +3751,14 @@ func _prepare_run_layout() -> void:
 	for i in range(1, _max_level + 1):
 		levels.append(i)
 	levels.shuffle()
+	var _pick_weighted_early_level := func() -> int:
+		var pool: Array[int] = []
+		for lvl in range(1, _max_level + 1):
+			pool.append(lvl)
+			if lvl <= 3 and _max_level > 1:
+				for _i in range(EARLY_LEVEL_WEIGHT - 1):
+					pool.append(lvl)
+		return pool[_rng.randi_range(0, pool.size() - 1)]
 	var specials: Array[StringName] = [&"codex", &"crown", &"ring"]
 	for s in specials:
 		if levels.is_empty():
@@ -3788,13 +3797,20 @@ func _prepare_run_layout() -> void:
 		arrow_levels.append(i6)
 	arrow_levels.shuffle()
 	var arrow_total: int = _rng.randi_range(1, min(3, _max_level))
-	for _i_arrow in range(arrow_total):
-		if arrow_levels.is_empty():
-			break
-		var al: int = arrow_levels.pop_back()
+	# Guarantee at least one arrow pickup with a bias toward early floors
+	var ensured_arrow_level: int = _pick_weighted_early_level.call()
+	_arrow_plan[ensured_arrow_level] = 1
+	var remaining_arrows: int = max(0, arrow_total - 1)
+	var attempts: int = 0
+	while remaining_arrows > 0 and attempts < 100:
+		attempts += 1
+		var al: int = _pick_weighted_early_level.call()
+		if _arrow_plan.has(al):
+			continue
 		_arrow_plan[al] = 1
-	_wand_level = _rng.randi_range(1, _max_level)
-	_bow_level = _rng.randi_range(1, _max_level)
+		remaining_arrows -= 1
+	_wand_level = _pick_weighted_early_level.call()
+	_bow_level = _pick_weighted_early_level.call()
 	if DEBUG_FORCE_RANGED:
 		_wand_level = 1
 		_bow_level = 1
