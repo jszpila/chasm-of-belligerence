@@ -4,13 +4,75 @@
 [ext_resource type="TileSet" uid="uid://tayrg5g1nh5u" path="res://tiles/Sprites.tileset.tres" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="3"]
 [ext_resource type="Script" uid="uid://chd0omw48s33h" path="res://scripts/PixelScaler.gd" id="4"]
-[ext_resource type="FontFile" path="res://assets/m5x7.ttf" id="5"]
+[ext_resource type="FontFile" uid="uid://dbpxw2pwxyox7" path="res://assets/m5x7.ttf" id="5"]
 [ext_resource type="FontFile" uid="uid://lcsi3iekfbl5" path="res://assets/DungeonFont.ttf" id="6"]
 [ext_resource type="Texture2D" uid="uid://bhg4ca6sfvhf4" path="res://assets/CoB-title.png" id="7"]
-[ext_resource type="Texture2D" path="res://assets/cob-title-mb.png" id="18"]
 [ext_resource type="Texture2D" uid="uid://c2rxob573x2am" path="res://assets/codex-quest-win.png" id="8"]
 [ext_resource type="Texture2D" uid="uid://l3gvmh8f4b6k" path="res://assets/codex-quest-lose.png" id="9"]
 [ext_resource type="Script" uid="uid://by1ivrwoxrbkv" path="res://scripts/Item.gd" id="17"]
+
+[sub_resource type="StyleBoxFlat" id="2"]
+bg_color = Color(0, 0, 0, 0)
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="3"]
+bg_color = Color(0, 0, 0, 0)
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="4"]
+bg_color = Color(0, 0, 0, 0)
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="5"]
+bg_color = Color(0, 0, 0, 0)
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="6"]
+bg_color = Color(0, 0, 0, 0)
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="7"]
+bg_color = Color(0, 0, 0, 0)
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="8"]
+bg_color = Color(0, 0, 0, 0)
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 0)
 
 [sub_resource type="LabelSettings" id="1"]
 font = ExtResource("6")
@@ -18,69 +80,6 @@ font_size = 84
 shadow_size = 2
 shadow_color = Color(0, 0, 0, 0.65)
 shadow_offset = Vector2(2, 2)
-
-[sub_resource type="StyleBoxFlat" id="2"]
-draw_center = false
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
-
-[sub_resource type="StyleBoxFlat" id="3"]
-draw_center = false
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
-
-[sub_resource type="StyleBoxFlat" id="4"]
-draw_center = false
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
-
-[sub_resource type="StyleBoxFlat" id="5"]
-draw_center = false
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
-
-[sub_resource type="StyleBoxFlat" id="6"]
-draw_center = false
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
-
-[sub_resource type="StyleBoxFlat" id="7"]
-draw_center = false
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
-
-[sub_resource type="StyleBoxFlat" id="8"]
-draw_center = false
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1")
@@ -136,8 +135,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_fonts/font = ExtResource("6")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("6")
 theme_override_font_sizes/font_size = 72
 text = "Loading..."
 horizontal_alignment = 1
@@ -158,8 +157,8 @@ custom_minimum_size = Vector2(220, 64)
 layout_mode = 2
 size_flags_horizontal = 0
 size_flags_vertical = 4
-alignment = 1
 theme_override_constants/separation = 0
+alignment = 1
 
 [node name="HeartsBorder" type="PanelContainer" parent="HUD/HUDBar/HUDVitals"]
 custom_minimum_size = Vector2(220, 28)
@@ -194,82 +193,68 @@ theme_override_styles/panel = SubResource("4")
 
 [node name="HUDTextGrid" type="GridContainer" parent="HUD/HUDBar/HUDTextGroup"]
 layout_mode = 2
-columns = 3
-h_separation = 4
-v_separation = 0
 size_flags_vertical = 4
+columns = 3
 
 [node name="HUDLevel" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
 custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5")
 theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("5")
 text = "FLR: 1"
-horizontal_alignment = 0
 vertical_alignment = 1
-size_flags_vertical = 4
 
 [node name="HUDATKLabel" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
 custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5")
 theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("6")
 text = "ATK: 0"
-horizontal_alignment = 0
 vertical_alignment = 1
-size_flags_vertical = 4
 
 [node name="HUDDEFLabel" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
 custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5")
 theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("7")
 text = "DEF: 0"
-horizontal_alignment = 0
 vertical_alignment = 1
-size_flags_vertical = 4
 
 [node name="HUDArrows" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
 custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5")
 theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("8")
 text = "ARR: 0"
-horizontal_alignment = 0
 vertical_alignment = 1
-size_flags_vertical = 4
 
 [node name="HUDPlayerLevel" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
 custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5")
 theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("8")
 text = "LVL: 0"
-horizontal_alignment = 0
 vertical_alignment = 1
-size_flags_vertical = 4
 
 [node name="HUDScore" type="Label" parent="HUD/HUDBar/HUDTextGroup/HUDTextGrid"]
 custom_minimum_size = Vector2(72, 30)
 layout_mode = 2
-theme_override_fonts/font = ExtResource("5")
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("5")
 theme_override_font_sizes/font_size = 28
 theme_override_styles/normal = SubResource("8")
 text = "EXP: 0"
-horizontal_alignment = 0
 vertical_alignment = 1
-size_flags_vertical = 4
 
 [node name="HUDItems" type="PanelContainer" parent="HUD/HUDBar"]
 custom_minimum_size = Vector2(320, 64)
@@ -281,114 +266,112 @@ theme_override_styles/panel = SubResource("4")
 [node name="HUDItemsContainer" type="GridContainer" parent="HUD/HUDBar/HUDItems"]
 custom_minimum_size = Vector2(320, 64)
 layout_mode = 2
-columns = 8
-h_separation = 4
-v_separation = 4
 size_flags_vertical = 4
+columns = 8
 
 [node name="HUDKey1Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDKey2Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDKey3Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDSwordIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDShieldIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDCodexIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDCrownIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDRune1Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDRune2Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDRune3Icon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDTorchIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDRingIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDPotionIcon" type="TextureRect" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDBowSlot" type="PanelContainer" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(30, 30)
@@ -399,9 +382,9 @@ size_flags_vertical = 4
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
 
 [node name="HUDWandSlot" type="PanelContainer" parent="HUD/HUDBar/HUDItems/HUDItemsContainer"]
 custom_minimum_size = Vector2(30, 30)
@@ -412,9 +395,10 @@ size_flags_vertical = 4
 custom_minimum_size = Vector2(28, 28)
 layout_mode = 2
 size_flags_vertical = 4
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
+
 [node name="Fade" type="ColorRect" parent="HUD"]
 z_index = 100
 anchors_preset = 15
@@ -441,8 +425,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("7")
+expand_mode = 1
 stretch_mode = 5
-expand = true
 
 [node name="TitleLabel" type="Label" parent="Title"]
 z_index = 200
@@ -459,13 +443,12 @@ vertical_alignment = 1
 
 [node name="VersionLabel" type="Label" parent="Title"]
 z_index = 210
-anchors_preset = 10
+anchors_preset = 9
 anchor_bottom = 1.0
 offset_left = 8.0
 offset_bottom = -8.0
 grow_vertical = 0
 text = "Built: unknown"
-horizontal_alignment = 0
 vertical_alignment = 2
 
 [node name="GameOver" type="CanvasLayer" parent="."]
@@ -478,8 +461,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("8")
+expand_mode = 1
 stretch_mode = 5
-expand = true
 
 [node name="OverBGLose" type="TextureRect" parent="GameOver"]
 visible = false
@@ -489,8 +472,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("9")
+expand_mode = 1
 stretch_mode = 5
-expand = true
 
 [node name="OverLabel" type="Label" parent="GameOver"]
 z_index = 200
