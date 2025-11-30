@@ -7,6 +7,7 @@ var hp: int = 1
 var max_hp: int = 1
 var corpse_texture: Texture2D
 var alive: bool = true
+var web_stuck_turns: int = 0
 
 func configure(cell: Vector2i, hp_value: int, corpse_tex: Texture2D) -> void:
 	enemy_type = enemy_type if enemy_type != StringName() else &"enemy"

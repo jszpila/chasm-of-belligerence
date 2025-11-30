@@ -164,3 +164,16 @@ func test_final_door_fx_visibility() -> void:
 	if main._door_glow:
 		main._door_glow.queue_free()
 	main.queue_free()
+
+func test_spiderweb_trap_affects_enemies() -> void:
+	var main: Node = _fresh_main()
+	var trap: Trap = _trap_script.new()
+	trap.trap_type = &"spiderweb"
+	main._traps = [trap]
+	var goblin: Goblin = _goblin_script.new()
+	goblin.grid_cell = Vector2i(1, 1)
+	main._handle_enemy_hit_by_trap(goblin, trap)
+	assert_true(goblin.web_stuck_turns > 0, "Spiderweb should freeze enemies in place")
+	assert_true(main._traps.is_empty(), "Spiderweb trap should be consumed after triggering")
+	goblin.queue_free()
+	main.queue_free()

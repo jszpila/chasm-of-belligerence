@@ -822,30 +822,38 @@ func _on_player_attempt_move() -> bool:
 		return false
 	return true
 
+func _enemy_can_act(enemy: Enemy) -> bool:
+	if enemy == null:
+		return false
+	if enemy.web_stuck_turns > 0:
+		enemy.web_stuck_turns = max(0, enemy.web_stuck_turns - 1)
+		return false
+	return true
+
 func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
 	# 75% chance each goblin attempts to move 1 step in a random dir
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	for goblin: Goblin in _goblins:
-		if goblin.alive and _rng.randf() <= 0.75:
+		if goblin.alive and _enemy_can_act(goblin) and _rng.randf() <= 0.75:
 			var d: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
 			_move_goblin(goblin, d)
 	for mouse: Mouse in _mice:
-		if mouse.alive and _rng.randf() <= 0.75:
+		if mouse.alive and _enemy_can_act(mouse) and _rng.randf() <= 0.75:
 			var d2: Vector2i = dirs[_rng.randi_range(0, dirs.size() - 1)]
 			_move_mouse(mouse, d2)
 	# Move zombie (one per level) with low accuracy towards player, less accurate at distance
 	for zombie: Zombie in _zombies:
-		if zombie.alive:
+		if zombie.alive and _enemy_can_act(zombie):
 			_move_homing_enemy(zombie)
 	for i in range(_skeletons.size()):
 		var skeleton := _skeletons[i]
 		if i >= skip_skeletons_from:
 			continue
-		if skeleton.alive:
+		if skeleton.alive and _enemy_can_act(skeleton):
 			_move_homing_enemy(skeleton)
 	# Move minotaur (zero on L1, one on L2) with higher accuracy towards player
 	for mino: Minotaur in _minotaurs:
-		if mino.alive:
+		if mino.alive and _enemy_can_act(mino):
 			_move_homing_enemy(mino)
 	_update_fov()
 
@@ -3579,6 +3587,10 @@ func _handle_enemy_hit_by_trap(enemy: Enemy, trap: Trap) -> void:
 	if enemy == null or not enemy.alive:
 		return
 	if trap.trap_type == &"spiderweb":
+		enemy.web_stuck_turns = max(enemy.web_stuck_turns, _rng.randi_range(2, 5))
+		_log_action("Webbed an enemy!")
+		_traps.erase(trap)
+		trap.queue_free()
 		return
 	enemy.apply_damage(1)
 	if not enemy.alive:
