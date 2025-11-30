@@ -56,6 +56,7 @@ const RANGED_NONE := &"none"
 const ARROWS_PER_PICKUP := 3
 const SHARED_FLOOR_WEIGHT := 0.15
 const DEBUG_FORCE_RANGED := false
+const DEBUG_SPAWN_ALL_ITEMS := false
 var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
@@ -121,6 +122,7 @@ var _projectile_pool: Array[Line2D] = []
 var _projectile_active: Array[Line2D] = []
 var _title_textures: Array[Texture2D] = []
 var _audio_pool: Array[AudioStreamPlayer] = []
+var _debug_items: Array[Item] = []
 @onready var _loading_label: Label = $HUD/LoadingLabel
 
 @onready var floor_map: TileMap = $Floor
@@ -654,6 +656,7 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_check_win()
+		_check_win()
 	elif st == &"crown" and not _crown_collected and cp == _codex_cell:
 		_crown_collected = true
 		_crown_icon_persistent = true
@@ -664,6 +667,7 @@ func _process(_delta: float) -> void:
 		_update_door_texture()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
+	_debug_check_special_pickups(cp)
 	if not _shield_collected and cp == _shield_cell:
 		_shield_collected = true
 		print("GOT SHIELD")
@@ -956,6 +960,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	_clear_runes()
 	_clear_armor_items()
 	_clear_bones()
+	_clear_debug_items()
 	_potion_collected = false
 	_potion2_collected = false
 	_reset_items_visibility()
@@ -1042,6 +1047,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			_bow_node.visible = false
 	# Place potion(s): between 0-2 per level
 	var potion_count := _rng.randi_range(0, 2)
+	if DEBUG_SPAWN_ALL_ITEMS and _level == 1:
+		potion_count = max(1, potion_count)
 	if potion_count > 0:
 		_potion_cell = _level_builder.pick_free_interior_cell(
 			grid_size,
@@ -1328,6 +1335,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			t_exclude.append(zcells[0])
 		var tcell := _level_builder.pick_free_interior_cell(grid_size, t_exclude, is_free, has_free_neighbor)
 		_spawn_trap_at(tcell)
+	_spawn_debug_items_level1(grid_size)
 
 func _restart_game() -> void:
 	# Fade to black
@@ -1387,6 +1395,8 @@ func _restart_game() -> void:
 	_level_states.clear()
 	_torch_collected = false
 	_torch_target_level = _rng.randi_range(1, _max_level)
+	if DEBUG_SPAWN_ALL_ITEMS:
+		_torch_target_level = 1
 	_ring_collected = false
 	_ring_cell = Vector2i.ZERO
 	_rune1_cells.clear()
@@ -1534,6 +1544,103 @@ func _ensure_ranged_pickups_ready() -> void:
 		_bow_node.collected = false if DEBUG_FORCE_RANGED else _bow_node.collected
 		if _bow_node.visible:
 			_set_sprite_tex(_bow_node, BOW_TEX)
+
+func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
+	if not DEBUG_SPAWN_ALL_ITEMS or _level != 1:
+		return
+	_clear_debug_items()
+	var player_cell := Grid.world_to_cell(player.global_position)
+	var exclude: Array[Vector2i] = [
+		player_cell,
+		_key_cell,
+		_sword_cell,
+		_shield_cell,
+		_potion_cell,
+		_potion2_cell,
+		_codex_cell,
+		_ring_cell,
+		_torch_cell,
+		_wand_cell,
+		_bow_cell
+	]
+	exclude.append_array(_arrow_cells)
+	exclude.append_array(_rune1_cells)
+	exclude.append_array(_rune2_cells)
+	exclude.append_array(_rune3_cells)
+	exclude.append_array(_armor_cells)
+	var pick_cell := func() -> Vector2i:
+		var c := _level_builder.pick_free_interior_cell(
+			grid_size,
+			exclude,
+			Callable(self, "_is_free"),
+			Callable(self, "_has_free_neighbor")
+		)
+		exclude.append(c)
+		return c
+	_torch_target_level = 1
+	if _torch_node and not _torch_collected:
+		_torch_cell = pick_cell.call()
+		_torch_node.place(_torch_cell)
+	if _potion2_node:
+		_potion2_collected = false
+		_potion2_cell = pick_cell.call()
+		_potion2_node.place(_potion2_cell)
+	if _wand_node and not _wand_collected:
+		_wand_level = 1
+		_wand_cell = pick_cell.call()
+		_wand_node.place(_wand_cell)
+		_normalize_item_node(_wand_node, WAND_TEX)
+	if _bow_node and not _bow_collected:
+		_bow_level = 1
+		_bow_cell = pick_cell.call()
+		_bow_node.place(_bow_cell)
+		_normalize_item_node(_bow_node, BOW_TEX)
+	if _ring_node and not _ring_collected:
+		_ring_cell = pick_cell.call()
+		_ring_node.place(_ring_cell)
+		_normalize_item_node(_ring_node, RING_TEX)
+	if _rune1_nodes.is_empty():
+		var c1: Vector2i = pick_cell.call()
+		var n1: Item = _make_item_node("DebugRune1", RUNE1_TEX)
+		add_child(n1)
+		n1.place(c1)
+		_rune1_cells.append(c1)
+		_rune1_nodes.append(n1)
+	if _rune2_nodes.is_empty():
+		var c2: Vector2i = pick_cell.call()
+		var n2: Item = _make_item_node("DebugRune2", RUNE2_TEX)
+		add_child(n2)
+		n2.place(c2)
+		_rune2_cells.append(c2)
+		_rune2_nodes.append(n2)
+	if _rune3_nodes.is_empty():
+		var c3: Vector2i = pick_cell.call()
+		var n3: Item = _make_item_node("DebugRune3", RUNE3_TEX)
+		add_child(n3)
+		n3.place(c3)
+		_rune3_cells.append(c3)
+		_rune3_nodes.append(n3)
+	if _armor_nodes.is_empty():
+		var ac: Vector2i = pick_cell.call()
+		var an: Item = _make_item_node("DebugArmor", ARMOR_TEX)
+		add_child(an)
+		an.place(ac)
+		_armor_cells.append(ac)
+		_armor_nodes.append(an)
+	if _arrow_cells.is_empty():
+		var arrow_cell: Vector2i = pick_cell.call()
+		_arrow_cells.append(arrow_cell)
+		_ensure_arrow_nodes(1)
+		var anode := _arrow_nodes[0]
+		if anode:
+			anode.collected = false
+			anode.place(arrow_cell)
+	if not _codex_collected:
+		_add_debug_item("DebugCodex", CODEX_TEX, pick_cell.call())
+	if not _crown_collected:
+		_add_debug_item("DebugCrown", CROWN_TEX, pick_cell.call())
+	if not _ring_collected:
+		_add_debug_item("DebugRing", RING_TEX, pick_cell.call())
 
 func _update_fade_rect() -> void:
 	if _fade == null:
@@ -1770,8 +1877,7 @@ func _attack_bonus() -> int:
 	var bonus := 0
 	if _sword_collected:
 		bonus += 1
-	if _has_rune1():
-		bonus += 1
+	bonus += _rune1_collected_count
 	bonus += _attack_level_bonus
 	return bonus
 
@@ -1779,10 +1885,40 @@ func _defense_bonus() -> int:
 	var bonus := 0
 	if _shield_collected:
 		bonus += 1
-	if _has_rune2():
-		bonus += 1
+	bonus += _rune2_collected_count
 	bonus += _defense_level_bonus
 	return bonus
+
+func _debug_check_special_pickups(cp: Vector2i) -> void:
+	if not DEBUG_SPAWN_ALL_ITEMS:
+		return
+	for item in _debug_items:
+		if item == null or item.collected:
+			continue
+		if cp != item.grid_cell:
+			continue
+		match String(item.item_type):
+			"DebugCodex":
+				_codex_collected = true
+				_codex_icon_persistent = true
+			"DebugCrown":
+				_crown_collected = true
+				_crown_icon_persistent = true
+			"DebugRing":
+				_ring_collected = true
+		item.collect()
+		_add_score(1)
+		_update_door_texture()
+		_play_sfx(SFX_PICKUP2)
+		_blink_node(player)
+
+func _debug_cell_blocked(cell: Vector2i) -> bool:
+	if not DEBUG_SPAWN_ALL_ITEMS:
+		return false
+	for item in _debug_items:
+		if item != null and not item.collected and item.grid_cell == cell:
+			return true
+	return false
 
 func _apply_restored_items() -> void:
 	if _key_node:
@@ -2211,6 +2347,8 @@ func _start_game() -> void:
 	_hp_max = 3
 	_hp_current = _hp_max
 	_torch_target_level = _rng.randi_range(1, _max_level)
+	if DEBUG_SPAWN_ALL_ITEMS:
+		_torch_target_level = 1
 	_score = 0
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
@@ -2218,6 +2356,7 @@ func _start_game() -> void:
 	_active_ranged_weapon = RANGED_NONE
 	_brazier_cells.clear()
 	_clear_braziers()
+	_clear_debug_items()
 	_update_hud_icons()
 	_clear_enemies()
 	_clear_runes()
@@ -2356,6 +2495,9 @@ func _set_world_visible(visible: bool) -> void:
 	for mouse in _mice:
 		mouse.visible = visible and mouse.alive
 	_decor.visible = visible
+	for ditem in _debug_items:
+		if ditem:
+			ditem.visible = visible and not ditem.collected
 	if _door_node:
 		_door_node.visible = visible
 	if _entrance_door_node:
@@ -2622,6 +2764,9 @@ func _reset_items_visibility() -> void:
 	if _ring_node:
 		_ring_node.collected = _ring_collected
 		_ring_node.visible = _current_level_special_type() == &"ring" and not _ring_collected
+	for ditem in _debug_items:
+		if ditem:
+			ditem.visible = not ditem.collected
 	for anode in _arrow_nodes:
 		if anode:
 			anode.collected = anode.collected
@@ -2654,7 +2799,7 @@ func _place_bones(grid_size: Vector2i) -> void:
 				continue
 			if not _is_free(c):
 				continue
-			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _armor_cells.has(c):
+			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _armor_cells.has(c) or _debug_cell_blocked(c):
 				continue
 			if _get_enemy_at(c) != null:
 				continue
@@ -3515,6 +3660,19 @@ func _make_item_node(item_name: String, tex: Texture2D) -> Item:
 	item.add_child(s)
 	return item
 
+func _clear_debug_items() -> void:
+	for item in _debug_items:
+		if item:
+			item.queue_free()
+	_debug_items.clear()
+
+func _add_debug_item(item_name: String, tex: Texture2D, cell: Vector2i) -> Item:
+	var item := _make_item_node(item_name, tex)
+	add_child(item)
+	item.place(cell)
+	_debug_items.append(item)
+	return item
+
 func _ensure_arrow_nodes(count: int) -> void:
 	if _arrow_nodes.is_empty() and _arrow_base_node:
 		_arrow_nodes.append(_arrow_base_node)
@@ -3577,6 +3735,7 @@ func _setup_input() -> void:
 			InputMap.action_add_event(name, ev)
 
 func _prepare_run_layout() -> void:
+	_clear_debug_items()
 	_max_level = _rng.randi_range(3, 10)
 	_level_special_map.clear()
 	_special_levels.clear()
@@ -3621,25 +3780,37 @@ func _prepare_run_layout() -> void:
 	for i4 in range(rune2_total):
 		var rl2: int = _rng.randi_range(1, _max_level)
 		_rune2_plan[rl2] = _rune2_plan.get(rl2, 0) + 1
-		for i5 in range(rune3_total):
-			var rl3: int = _rng.randi_range(1, _max_level)
-			_rune3_plan[rl3] = _rune3_plan.get(rl3, 0) + 1
-		var arrow_levels: Array[int] = []
-		for i6 in range(1, _max_level + 1):
-			arrow_levels.append(i6)
-		arrow_levels.shuffle()
-		var arrow_total: int = _rng.randi_range(1, min(3, _max_level))
-		for _i_arrow in range(arrow_total):
-			if arrow_levels.is_empty():
-				break
-			var al: int = arrow_levels.pop_back()
-			_arrow_plan[al] = 1
-		_wand_level = _rng.randi_range(1, _max_level)
-		_bow_level = _rng.randi_range(1, _max_level)
-		if DEBUG_FORCE_RANGED:
-			_wand_level = 1
-			_bow_level = 1
-			_arrow_plan[1] = 1
+	for i5 in range(rune3_total):
+		var rl3: int = _rng.randi_range(1, _max_level)
+		_rune3_plan[rl3] = _rune3_plan.get(rl3, 0) + 1
+	var arrow_levels: Array[int] = []
+	for i6 in range(1, _max_level + 1):
+		arrow_levels.append(i6)
+	arrow_levels.shuffle()
+	var arrow_total: int = _rng.randi_range(1, min(3, _max_level))
+	for _i_arrow in range(arrow_total):
+		if arrow_levels.is_empty():
+			break
+		var al: int = arrow_levels.pop_back()
+		_arrow_plan[al] = 1
+	_wand_level = _rng.randi_range(1, _max_level)
+	_bow_level = _rng.randi_range(1, _max_level)
+	if DEBUG_FORCE_RANGED:
+		_wand_level = 1
+		_bow_level = 1
+		_arrow_plan[1] = 1
+	if DEBUG_SPAWN_ALL_ITEMS:
+		_level_key_map[1] = _level_key_map.get(1, &"key1")
+		_armor_plan[1] = max(1, _armor_plan.get(1, 0))
+		_rune1_plan[1] = max(1, _rune1_plan.get(1, 0))
+		_rune2_plan[1] = max(1, _rune2_plan.get(1, 0))
+		_rune3_plan[1] = max(1, _rune3_plan.get(1, 0))
+		_arrow_plan[1] = max(1, _arrow_plan.get(1, 0))
+		_wand_level = 1
+		_bow_level = 1
+		_torch_target_level = 1
+		_level_special_map[1] = &"ring"
+		_special_levels[&"ring"] = 1
 
 func _register_enemy(enemy: Enemy) -> void:
 	if enemy == null:
