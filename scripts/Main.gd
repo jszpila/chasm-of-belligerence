@@ -1153,6 +1153,7 @@ func _imp_fire_shot(imp: Imp, dir: Vector2i, dist: int, player_cell: Vector2i) -
 	if _rng.randf() < _imp_miss_chance(dist):
 		_log_action("That was close!")
 		return
+	_set_death_cause_enemy(&"imp")
 	_apply_player_damage(1)
 	_log_action("Imp hits you!")
 
@@ -2044,6 +2045,7 @@ func _combat_round_enemy(enemy: Enemy, force_outcome: bool = false) -> void:
 				_handle_enemy_death(enemy)
 			_check_win()
 		else:
+			_set_death_cause_enemy(enemy.enemy_type)
 			_handle_player_hit()
 		break
 
@@ -2062,6 +2064,10 @@ func _enemy_score_value(enemy: Enemy) -> int:
 	if enemy.enemy_type == &"minotaur" or enemy.enemy_type == &"imp":
 		return 2
 	return 1
+
+func _set_death_cause_enemy(enemy_type: StringName) -> void:
+	if enemy_type != StringName():
+		_last_death_cause = enemy_type
 
 func _add_score(amount: int) -> void:
 	_score += amount
@@ -2916,13 +2922,13 @@ func _resize_fullscreen_art() -> void:
 func _death_cause_text() -> String:
 	if _last_death_cause == &"trap":
 		return "Died of tetanus on Floor %d" % _level
-	if _last_death_cause == StringName() or _enemy_map.is_empty():
+	if _last_death_cause != StringName():
+		return "Defeated at the hands of a %s on Floor %d" % [String(_last_death_cause), _level]
+	if _enemy_map.is_empty():
 		return "Defeated at the hands of a monster on Floor %d" % _level
 	for e in _enemy_map.values():
 		if e is Enemy and e.alive:
 			return "Defeated at the hands of a %s on Floor %d" % [String(e.enemy_type), _level]
-	if _last_death_cause != StringName():
-		return "Defeated at the hands of a %s on Floor %d" % [String(_last_death_cause), _level]
 	return "Defeated at the hands of a monster on Floor %d" % _level
 
 func _random_texture(options: Array[Texture2D]) -> Texture2D:
