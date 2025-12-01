@@ -186,6 +186,7 @@ const ACTION_LOG_FONT := preload("res://assets/m5x7.ttf")
 @onready var _title_build_label: Label = $Title/VersionLabel
 @onready var _over_layer: CanvasLayer = $GameOver
 @onready var _over_label: Label = $GameOver/OverLabel
+@onready var _over_result: Label = $GameOver/OverResult
 @onready var _over_score: Label = $GameOver/OverScore
 @onready var _title_bg: TextureRect = $Title/TitleBG
 @onready var _over_bg_win: TextureRect = $GameOver/OverBGWin
@@ -2638,12 +2639,18 @@ func _show_game_over(won: bool) -> void:
 		if tex:
 			target_rect.texture = tex
 	_hide_loading()
-	_over_label.add_theme_font_size_override("font_size", 48)
-	_over_label.text = "Press Enter to restart"
+	if _over_result:
+		_over_result.visible = true
+		_over_result.text = "Thou hast Triumphed!" if won else "Thou hast Perished!"
+		_over_result.add_theme_font_size_override("font_size", 64)
+	if _over_label:
+		_over_label.visible = true
+		_over_label.add_theme_font_size_override("font_size", 96)
+		_over_label.text = "Press Enter to restart"
 	if _over_score:
-		_over_score.add_theme_font_size_override("font_size", 36)
-		_over_score.offset_top = -get_viewport_rect().size.y * 0.12
+		_over_score.add_theme_font_size_override("font_size", 80)
 		_over_score.text = "EXP: %d" % _score
+	_position_game_over_labels(get_viewport_rect().size)
 	_update_title_build_label()
 
 func _on_viewport_resized() -> void:
@@ -2657,8 +2664,7 @@ func _resize_fullscreen_art() -> void:
 			rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
 			rect.expand = true
 	_title_label.offset_top = viewport_size.y * 0.5
-	if _over_score:
-		_over_score.offset_top = -viewport_size.y * 0.12
+	_position_game_over_labels(viewport_size)
 	_update_title_build_label()
 
 func _random_texture(options: Array[Texture2D]) -> Texture2D:
@@ -2672,6 +2678,24 @@ func _random_texture(options: Array[Texture2D]) -> Texture2D:
 		return null
 	var pick := _rng.randi_range(0, available.size() - 1)
 	return available[pick]
+
+func _position_game_over_labels(viewport_size: Vector2) -> void:
+	# Place result near top, then score, then restart prompt.
+	var result_y := viewport_size.y * 0.22
+	var score_y := viewport_size.y * 0.36
+	var prompt_y := viewport_size.y * 0.46
+	var result_h := 80.0
+	var score_h := 60.0
+	var prompt_h := 60.0
+	if _over_result:
+		_over_result.offset_top = result_y
+		_over_result.offset_bottom = result_y + result_h - viewport_size.y
+	if _over_score:
+		_over_score.offset_top = score_y
+		_over_score.offset_bottom = score_y + score_h - viewport_size.y
+	if _over_label:
+		_over_label.offset_top = prompt_y
+		_over_label.offset_bottom = prompt_y + prompt_h - viewport_size.y
 
 func _set_world_visible(visible: bool) -> void:
 	floor_map.visible = visible

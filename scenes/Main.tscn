@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3 uid="uid://bof05ivffmn5u"]
+[gd_scene load_steps=21 format=3 uid="uid://bof05ivffmn5u"]
 
 [ext_resource type="Script" uid="uid://s5pbhuqwkwq4" path="res://scripts/Main.gd" id="1"]
 [ext_resource type="TileSet" uid="uid://tayrg5g1nh5u" path="res://tiles/Sprites.tileset.tres" id="2"]
@@ -78,6 +78,20 @@ border_color = Color(0, 0, 0, 0)
 font = ExtResource("6")
 font_size = 84
 shadow_size = 2
+shadow_color = Color(0, 0, 0, 0.65)
+shadow_offset = Vector2(2, 2)
+
+[sub_resource type="LabelSettings" id="10"]
+font = ExtResource("5")
+font_size = 36
+shadow_size = 2
+shadow_color = Color(0, 0, 0, 0.65)
+shadow_offset = Vector2(2, 2)
+
+[sub_resource type="LabelSettings" id="9"]
+font = ExtResource("6")
+font_size = 64
+shadow_size = 3
 shadow_color = Color(0, 0, 0, 0.65)
 shadow_offset = Vector2(2, 2)
 
@@ -524,8 +538,9 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_fonts/font = ExtResource("6")
+theme_override_fonts/font = ExtResource("5")
 text = "Press Enter to restart"
+label_settings = SubResource("10")
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -534,10 +549,24 @@ z_index = 200
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -48.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_fonts/font = ExtResource("5")
+label_settings = SubResource("10")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OverResult" type="Label" parent="GameOver"]
+z_index = 200
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_fonts/font = ExtResource("6")
+theme_override_font_sizes/font_size = 64
+text = "YOU WON"
+label_settings = SubResource("9")
 horizontal_alignment = 1
 vertical_alignment = 1
 
