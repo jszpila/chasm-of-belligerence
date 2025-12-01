@@ -132,6 +132,8 @@ var _projectile_active: Array[Line2D] = []
 var _dash_trail_pool: Array[Line2D] = []
 var _dash_trail_active: Array[Line2D] = []
 var _title_textures: Array[Texture2D] = []
+var _win_textures: Array[Texture2D] = []
+var _lose_textures: Array[Texture2D] = []
 var _audio_pool: Array[AudioStreamPlayer] = []
 var _debug_items: Array[Item] = []
 var _action_log: Array[String] = []
@@ -300,7 +302,18 @@ func _load_spritesheet_textures() -> void:
 	ARROW_TEX = _sheet_tex(&"arrow", Vector2i(429, 130), true)
 	_title_textures = [
 		load("res://assets/CoB-title.png"),
-		load("res://assets/cob-title-mb.png")
+		load("res://assets/cob-title-mb.png"),
+		load("res://assets/cob-title-comic.png")
+	]
+	_win_textures = [
+		load("res://assets/codex-quest-win.png"),
+		load("res://assets/win-mb.png"),
+		load("res://assets/win-comic.png")
+	]
+	_lose_textures = [
+		load("res://assets/codex-quest-lose.png"),
+		load("res://assets/lose-mb.png"),
+		load("res://assets/lose-comic.png")
 	]
 	BONE_TEXTURES = [
 		_sheet_tex(&"bone1", Vector2i(0, 494), true),
@@ -2608,8 +2621,7 @@ func _show_title(visible: bool) -> void:
 	_over_layer.visible = false
 	_hide_loading()
 	if visible and _title_bg and not _title_textures.is_empty():
-		var pick := _rng.randi_range(0, _title_textures.size() - 1)
-		var tex: Texture2D = _title_textures[pick]
+		var tex: Texture2D = _random_texture(_title_textures)
 		if tex:
 			_title_bg.texture = tex
 	_title_label.add_theme_font_size_override("font_size", 64)
@@ -2619,6 +2631,12 @@ func _show_game_over(won: bool) -> void:
 	_over_layer.visible = true
 	_over_bg_win.visible = won
 	_over_bg_lose.visible = not won
+	var tex_arr := _win_textures if won else _lose_textures
+	var target_rect := _over_bg_win if won else _over_bg_lose
+	if target_rect and not tex_arr.is_empty():
+		var tex := _random_texture(tex_arr)
+		if tex:
+			target_rect.texture = tex
 	_hide_loading()
 	_over_label.add_theme_font_size_override("font_size", 48)
 	_over_label.text = "Press Enter to restart"
@@ -2642,6 +2660,18 @@ func _resize_fullscreen_art() -> void:
 	if _over_score:
 		_over_score.offset_top = -viewport_size.y * 0.12
 	_update_title_build_label()
+
+func _random_texture(options: Array[Texture2D]) -> Texture2D:
+	if options.is_empty():
+		return null
+	var available: Array[Texture2D] = []
+	for tex in options:
+		if tex != null:
+			available.append(tex)
+	if available.is_empty():
+		return null
+	var pick := _rng.randi_range(0, available.size() - 1)
+	return available[pick]
 
 func _set_world_visible(visible: bool) -> void:
 	floor_map.visible = visible
@@ -3375,7 +3405,8 @@ func _update_hud_icons() -> void:
 	_set_icon_visible(_hud_icon_rune1, show and _has_rune1())
 	_set_icon_visible(_hud_icon_rune2, show and _has_rune2())
 	_set_icon_visible(_hud_icon_rune3, show and _has_rune3())
-	_set_icon_visible(_hud_icon_rune4, show and _has_rune4())
+	var show_rune4 := show and _has_rune4()
+	_set_icon_visible(_hud_icon_rune4, show_rune4)
 	_set_icon_visible(_hud_icon_torch, show and _torch_collected)
 	if _hud_icon_ring and RING_TEX:
 		_hud_icon_ring.texture = RING_TEX
@@ -3413,6 +3444,8 @@ func _update_hud_icons() -> void:
 		var rune4_mod := Color(1, 1, 1, 1)
 		if _rune4_dash_cooldown > 0:
 			rune4_mod = Color(0.7, 0.7, 0.7, 1)
+		if not show_rune4:
+			rune4_mod.a = 0.0
 		_hud_icon_rune4.modulate = rune4_mod
 	if _hud_icon_bow:
 		_hud_icon_bow.modulate = bow_mod
