@@ -199,7 +199,7 @@ body {
 			<div class="flex-container">
 				<div class="flex-item">
 					<h2>The Story So Far...</h2>
-					<p>For causes known only to you and Crom, you have been cast into <i><b>THE CHASM OF BELLIGERENCE</b></i>. To escape, you must find the Codex, Crown, and Ring of the Goblin Lord Mukbang, for some reason.</p>
+					<p>For causes known only to you and Crom, you have been cast into <i><b>THE CHASM OF BELLIGERENCE</b></i>. To escape, you must fight your way to surface while searching for the Codex, Crown, and Ring of the Goblin Lord Mukbang, for some reason.</p>
 				</div>
 			</div>
 
@@ -214,8 +214,9 @@ body {
         <li>WASD or arrow keys to move (diagonal movement supported)</li>
 				<li>R to switch ranged weapons</li>
         <li>Q to use healing potion</li>
-        <li>Z to change zoom level</li>
-        <li>JKLI or numpad for ranged weapons</li>
+        <li>E + direction to dash attack, once enabled</li>
+        <li>JKLI or numpad to shoot ranged weapons</li>
+				<li>Z to change zoom level</li>
     </ul>
 </div>
 <div id="stuff" class="tab-content" style="display: none;">
@@ -224,7 +225,14 @@ body {
 			<li>The <strong>Sword</strong> grants a +1 attack bonus</li>
 			<li>The <strong>Shield</strong> grants a +1 defense bonus</li>
 			<li><strong>Health Potions</strong> restore 1 HP; you can carry 1 at a time</li>
-			<li><strong>Runes</strong> grant bonuses to attack, defense or max HP</li>
+			<li><strong>Runes</strong>
+				<ul>
+					<li><i>>Rune 1</i> grants a bonus to attack</li>
+					<li><i>>Rune 2</i> grants a bonus to defense</li>
+					<li><i>>Rune 3</i> grants adds +1 to max HP</li>
+					<li><i>Rune 4</i> enables the dash attack</li>
+				</ul>
+			</li>
 			<li><strong>Keys</strong> will unlock a level's door</li>
 			<li><strong>Armor</strong> provides you with protection</li>
 			<li>The <strong>Wand</strong> provides a 3-cell ranged magical attack</li>
@@ -237,11 +245,16 @@ body {
     <ul>
         <li>Mo' floors = mo' monsters</li>
         <li>Level up every 10 points</li>
-        <li>You can travel back and forth between floors</li>
+        <li>You can travel back (gray doors) and forth (brown doors) between floors</li>
 				<li>Arrows can miss; the farther away, the less likely you are to hit</li>
 				<li>Steer clear of spike traps!</li>
 				<li>If you step on a bone pile, there is chance you will disturb the dead</li>
 				<li>You can get (temporarily) stuck in big spider webs</li>
+				<li>The number of floors is randomized (min 3, max 10)</li>
+				<li>Traps hurt monsters, too!</li>
+				<li>Leveling up heals 1 HP</li>
+				<li>Zombies and Minotaurs will follow you</li>
+				<li>Dash attack cool-down is 20 turns and its range is 5 cells</li>
     </ul>
 </div>
 
@@ -259,7 +272,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":1,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":13465676,"index.wasm":36145869},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":1,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":29622936,"index.wasm":38034280},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
