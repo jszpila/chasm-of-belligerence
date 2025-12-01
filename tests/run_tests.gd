@@ -15,11 +15,12 @@ func _run() -> void:
 	_test_weighted_floor_sources()
 	_test_enemy_registry()
 	_test_bresenham_line()
+	_test_player_sprite_ranged_switch()
 	if not _failures.is_empty():
 		for f in _failures:
 			printerr(f)
 	else:
-		print("All tests passed (%d)" % 4)
+		print("All tests passed (%d)" % 5)
 
 func _assert_true(cond: bool, msg: String) -> void:
 	if not cond:
@@ -75,3 +76,30 @@ func _test_bresenham_line() -> void:
 		var step: Vector2i = pts[i] - pts[i - 1]
 		_assert_true(abs(step.x) <= 1 and abs(step.y) <= 1, "Bresenham steps should move at most 1 per axis")
 	main.queue_free()
+
+func _test_player_sprite_ranged_switch() -> void:
+	var main_script: Script = load("res://scripts/Main.gd")
+	var main: Node = main_script.new()
+	main._player_sprite = Sprite2D.new()
+	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	var tex_wand := ImageTexture.create_from_image(img)
+	var tex_bow := ImageTexture.create_from_image(img)
+	main.PLAYER_TEX_WAND = tex_wand
+	main.PLAYER_TEX_BOW = tex_bow
+	main.PLAYER_TEX_1 = ImageTexture.create_from_image(img)
+	main._sword_collected = false
+	main._shield_collected = false
+	main._wand_collected = true
+	main._bow_collected = true
+	main._active_ranged_weapon = main.RANGED_WAND
+	main._update_player_sprite_appearance()
+	_assert_eq(main._player_sprite.texture, tex_wand, "Player sprite should show wand when wand is active")
+	main._active_ranged_weapon = main.RANGED_BOW
+	main._update_player_sprite_appearance()
+	_assert_eq(main._player_sprite.texture, tex_bow, "Player sprite should show bow when bow is active")
+	main.PLAYER_TEX_WAND = null
+	main.PLAYER_TEX_BOW = null
+	main.PLAYER_TEX_1 = null
+	main._player_sprite.queue_free()
+	main.queue_free()
+	main = null

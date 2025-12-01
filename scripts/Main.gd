@@ -69,6 +69,9 @@ var PLAYER_TEX_1: Texture2D
 var PLAYER_TEX_2: Texture2D
 var PLAYER_TEX_3: Texture2D
 var PLAYER_TEX_4: Texture2D
+var PLAYER_TEX_WAND: Texture2D
+var PLAYER_TEX_BOW: Texture2D
+var PLAYER_TEX_TORCH: Texture2D
 var HEART_TEX: Texture2D
 var GOBLIN_TEX_1: Texture2D
 var DEAD_GOBLIN_TEX: Texture2D
@@ -265,6 +268,9 @@ func _load_spritesheet_textures() -> void:
 	PLAYER_TEX_2 = _sheet_tex(&"player2", Vector2i(1456, 0), true)
 	PLAYER_TEX_3 = _sheet_tex(&"player3", Vector2i(1937, 0), true)
 	PLAYER_TEX_4 = _sheet_tex(&"player4", Vector2i(1989, 0), true)
+	PLAYER_TEX_WAND = _sheet_tex(&"player_wand", Vector2i(1625, 0), true)
+	PLAYER_TEX_BOW = _sheet_tex(&"player_bow", Vector2i(2028, 0), true)
+	PLAYER_TEX_TORCH = _sheet_tex(&"player_torch", Vector2i(1898, 0), true)
 	HEART_TEX = _sheet_tex(&"heart", Vector2i(1014, 481), true)
 	GOBLIN_TEX_1 = _sheet_tex(&"goblin1", Vector2i(1352, 52), true)
 	DEAD_GOBLIN_TEX = _sheet_tex(&"goblin_dead", Vector2i(2613, 52), true)
@@ -733,6 +739,7 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_add_score(1)
+		_update_player_sprite_appearance()
 		_update_hud_icons()
 		_log_action("Picked up Wand")
 	if not _bow_collected and cp == _bow_cell:
@@ -745,6 +752,7 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_add_score(1)
+		_update_player_sprite_appearance()
 		_update_hud_icons()
 		_log_action("Picked up Bow")
 	# Torch pickup: extends FOV by +4 for the rest of the run
@@ -757,6 +765,7 @@ func _process(_delta: float) -> void:
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
 		_add_score(1)
+		_update_player_sprite_appearance()
 		_log_action("Picked up Torch")
 	if not _ring_collected and _current_level_special_type() == &"ring" and cp == _ring_cell:
 		_ring_collected = true
@@ -3393,14 +3402,26 @@ func _update_player_sprite_appearance() -> void:
 		return
 	_player_sprite.z_index = 5
 	var both := _sword_collected and _shield_collected
+	var tex: Texture2D = null
 	if both:
-		_player_sprite.texture = PLAYER_TEX_4
+		tex = PLAYER_TEX_4
 	elif _sword_collected:
-		_player_sprite.texture = PLAYER_TEX_3
+		tex = PLAYER_TEX_3
 	elif _shield_collected:
-		_player_sprite.texture = PLAYER_TEX_2
+		tex = PLAYER_TEX_2
+	elif _active_ranged_weapon == RANGED_WAND and _wand_collected and PLAYER_TEX_WAND:
+		tex = PLAYER_TEX_WAND
+	elif _active_ranged_weapon == RANGED_BOW and _bow_collected and PLAYER_TEX_BOW:
+		tex = PLAYER_TEX_BOW
+	elif _wand_collected and PLAYER_TEX_WAND:
+		tex = PLAYER_TEX_WAND
+	elif _bow_collected and PLAYER_TEX_BOW:
+		tex = PLAYER_TEX_BOW
+	elif _torch_collected and PLAYER_TEX_TORCH:
+		tex = PLAYER_TEX_TORCH
 	else:
-		_player_sprite.texture = PLAYER_TEX_1
+		tex = PLAYER_TEX_1
+	_player_sprite.texture = tex
 
 func _update_hud_icons() -> void:
 	# Icons appear only during gameplay and when items collected
@@ -3593,6 +3614,7 @@ func _cycle_ranged_weapon() -> void:
 	else:
 		_active_ranged_weapon = available[(idx + 1) % available.size()]
 	_update_hud_icons()
+	_update_player_sprite_appearance()
 
 func _fire_ranged(dir: Vector2i) -> bool:
 	if dir == Vector2i.ZERO or _state != STATE_PLAYING or _is_transitioning:
