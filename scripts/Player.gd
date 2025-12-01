@@ -38,6 +38,12 @@ func _process(delta: float) -> void:
 		return
 	if not _can_act:
 		return
+	var dash_dir := _dash_dir_from_input()
+	if dash_dir != Vector2i.ZERO:
+		var parent := get_parent()
+		if parent and parent.has_method("_on_player_dash_attempt") and parent._on_player_dash_attempt(dash_dir):
+			_move_cooldown = _move_repeat_time
+			return
 	# Support cardinal and diagonal movement by combining axes
 	var dir := Vector2i(0, 0)
 	if Input.is_action_pressed("move_left"):
@@ -52,6 +58,24 @@ func _process(delta: float) -> void:
 	if dir != Vector2i(0, 0):
 		_try_move(dir)
 		_move_cooldown = _move_repeat_time
+
+func _dash_dir_from_input() -> Vector2i:
+	if not Input.is_action_pressed("dash_attack"):
+		return Vector2i.ZERO
+	var dir := Vector2i.ZERO
+	if Input.is_action_pressed("move_left"):
+		dir.x -= 1
+	if Input.is_action_pressed("move_right"):
+		dir.x += 1
+	if Input.is_action_pressed("move_up"):
+		dir.y -= 1
+	if Input.is_action_pressed("move_down"):
+		dir.y += 1
+	if dir == Vector2i.ZERO:
+		return Vector2i.ZERO
+	var dash_pressed := Input.is_action_just_pressed("dash_attack")
+	var dir_just_pressed := Input.is_action_just_pressed("move_left") or Input.is_action_just_pressed("move_right") or Input.is_action_just_pressed("move_up") or Input.is_action_just_pressed("move_down")
+	return dir if (dash_pressed or dir_just_pressed) else Vector2i.ZERO
 
 func _try_move(delta_cell: Vector2i) -> void:
 	var dest := _grid_pos + delta_cell

@@ -54,6 +54,8 @@ const RANGED_WAND := &"wand"
 const RANGED_BOW := &"bow"
 const RANGED_NONE := &"none"
 const ARROWS_PER_PICKUP := 3
+const RUNE4_DASH_RANGE := 5
+const RUNE4_DASH_COOLDOWN_MOVES := 20
 const SHARED_FLOOR_WEIGHT := 0.15
 const DEBUG_FORCE_RANGED := false
 const DEBUG_SPAWN_ALL_ITEMS := false
@@ -91,6 +93,7 @@ var CROWN_TEX: Texture2D
 var RUNE1_TEX: Texture2D
 var RUNE2_TEX: Texture2D
 var RUNE3_TEX: Texture2D
+var RUNE4_TEX: Texture2D
 var TORCH_TEX: Texture2D
 var RING_TEX: Texture2D
 var ARMOR_ICON_TEX: Texture2D
@@ -126,6 +129,8 @@ var _debug_bow_outline: Line2D
 var _debug_wand_outline: Line2D
 var _projectile_pool: Array[Line2D] = []
 var _projectile_active: Array[Line2D] = []
+var _dash_trail_pool: Array[Line2D] = []
+var _dash_trail_active: Array[Line2D] = []
 var _title_textures: Array[Texture2D] = []
 var _audio_pool: Array[AudioStreamPlayer] = []
 var _debug_items: Array[Item] = []
@@ -147,6 +152,7 @@ var _action_log: Array[String] = []
 @onready var _hud_icon_rune1: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRune1Icon
 @onready var _hud_icon_rune2: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRune2Icon
 @onready var _hud_icon_rune3: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRune3Icon
+@onready var _hud_icon_rune4: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRune4Icon
 @onready var _hud_icon_torch: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDTorchIcon
 @onready var _hud_icon_ring: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDRingIcon
 @onready var _hud_icon_potion: TextureRect = $HUD/HUDBar/HUDItems/HUDItemsContainer/HUDPotionIcon
@@ -281,6 +287,7 @@ func _load_spritesheet_textures() -> void:
 	RUNE1_TEX = _sheet_tex(&"rune1", Vector2i(338, 221), true)
 	RUNE2_TEX = _sheet_tex(&"rune2", Vector2i(351, 221), true)
 	RUNE3_TEX = _sheet_tex(&"rune3", Vector2i(364, 221), true)
+	RUNE4_TEX = _sheet_tex(&"rune4", Vector2i(455, 221), true)
 	TORCH_TEX = _sheet_tex(&"torch", Vector2i(52, 546), true)
 	RING_TEX = _sheet_tex(&"ring", Vector2i(156, 559), true)
 	ARMOR_ICON_TEX = _sheet_tex(&"armor_icon", Vector2i(338, 156), true)
@@ -421,6 +428,7 @@ var _armor_cells: Array[Vector2i] = []
 var _rune1_cells: Array[Vector2i] = []
 var _rune2_cells: Array[Vector2i] = []
 var _rune3_cells: Array[Vector2i] = []
+var _rune4_cells: Array[Vector2i] = []
 var _torch_cell: Vector2i = Vector2i.ZERO
 var _ring_cell: Vector2i = Vector2i.ZERO
 var _codex_cell: Vector2i = Vector2i.ZERO
@@ -437,6 +445,7 @@ var _armor_current: int = 0
 var _rune1_collected_count: int = 0
 var _rune2_collected_count: int = 0
 var _rune3_collected_count: int = 0
+var _rune4_collected_count: int = 0
 var _torch_collected: bool = false
 var _ring_collected: bool = false
 var _codex_collected: bool = false
@@ -472,6 +481,7 @@ var _armor_nodes: Array[Item] = []
 var _rune1_nodes: Array[Item] = []
 var _rune2_nodes: Array[Item] = []
 var _rune3_nodes: Array[Item] = []
+var _rune4_nodes: Array[Item] = []
 var _torch_node: Item
 var _ring_node: Item
 var _door_cell: Vector2i = Vector2i.ZERO
@@ -499,6 +509,7 @@ var _armor_plan := {} # level -> count
 var _rune1_plan := {} # level -> count
 var _rune2_plan := {}
 var _rune3_plan := {}
+var _rune4_plan := {}
 var _arrow_plan := {} # level -> 0/1 arrow pickup
 var _level_states := {}
 var _wand_level: int = 1
@@ -506,6 +517,7 @@ var _bow_level: int = 1
 var _arrow_count: int = 0
 var _active_ranged_weapon: StringName = RANGED_NONE
 var _player_level: int = 0
+var _rune4_dash_cooldown: int = 0
 
 const STATE_TITLE := 0
 const STATE_PLAYING := 1
@@ -790,6 +802,16 @@ func _process(_delta: float) -> void:
 				_add_score(1)
 				_log_action("Got Rune-3 (+1 MAX HP)")
 				break
+		for r4 in _rune4_nodes:
+			if r4 != null and not r4.collected and cp == r4.grid_cell:
+				_rune4_collected_count += 1
+				print("GOT RUNE-4 (Dash Attack)")
+				r4.collect()
+				_play_sfx(SFX_PICKUP2)
+				_blink_node(player)
+				_add_score(1)
+				_log_action("Got Rune-4 (Dash Attack)")
+				break
 		for ar in _armor_nodes:
 			if ar != null and not ar.collected and cp == ar.grid_cell:
 				_armor_current = min(ARMOR_MAX, _armor_current + 1)
@@ -822,6 +844,58 @@ func _on_player_attempt_move() -> bool:
 		return false
 	return true
 
+func _on_player_dash_attempt(dir: Vector2i) -> bool:
+	if dir == Vector2i.ZERO or _state != STATE_PLAYING or _is_transitioning:
+		return false
+	if not _has_rune4():
+		return false
+	if _rune4_dash_cooldown > 0:
+		return false
+	var step_dir := Vector2i(sign(dir.x), sign(dir.y))
+	if step_dir == Vector2i.ZERO:
+		return false
+	var origin := Grid.world_to_cell(player.global_position)
+	var path: Array[Vector2i] = [origin]
+	var target: Enemy = null
+	var target_cell := origin
+	for i in range(1, RUNE4_DASH_RANGE + 1):
+		var c := origin + step_dir * i
+		if not _in_interior(c) or _is_wall(c):
+			break
+		target_cell = c
+		var enemy := _get_enemy_at(c)
+		if enemy != null:
+			target = enemy
+			break
+		path.append(c)
+	if target == null:
+		return false
+	_play_sfx(SFX_HURT1)
+	_log_action("Dash strike!")
+	_blink_node(target)
+	target.apply_damage(1)
+	var enemy_died := not target.alive
+	if not target.alive:
+		_handle_enemy_death(target)
+		_check_win()
+	_rune4_dash_cooldown = RUNE4_DASH_COOLDOWN_MOVES + 1
+	var landing_cell := target_cell if enemy_died else (path[-1] if path.size() > 1 else origin)
+	var trail_cells: Array[Vector2i] = [origin]
+	for cell in path:
+		if trail_cells[-1] != cell:
+			trail_cells.append(cell)
+	if trail_cells[-1] != landing_cell:
+		trail_cells.append(landing_cell)
+	if landing_cell == origin and target_cell != landing_cell and trail_cells[-1] != target_cell:
+		trail_cells.append(target_cell)
+	_show_dash_trail(trail_cells)
+	player.teleport_to_cell(landing_cell)
+	if landing_cell != origin:
+		_on_player_moved(landing_cell)
+	else:
+		_advance_enemies_and_update(_skeletons.size())
+	return true
+
 func _enemy_can_act(enemy: Enemy) -> bool:
 	if enemy == null:
 		return false
@@ -831,6 +905,7 @@ func _enemy_can_act(enemy: Enemy) -> bool:
 	return true
 
 func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
+	var prev_dash_cd := _rune4_dash_cooldown
 	# 75% chance each goblin attempts to move 1 step in a random dir
 	var dirs: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	for goblin: Goblin in _goblins:
@@ -856,6 +931,10 @@ func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
 		if mino.alive and _enemy_can_act(mino):
 			_move_homing_enemy(mino)
 	_update_fov()
+	if _rune4_dash_cooldown > 0:
+		_rune4_dash_cooldown = max(0, _rune4_dash_cooldown - 1)
+	if prev_dash_cd != _rune4_dash_cooldown:
+		_update_hud_icons()
 
 func _move_goblin(goblin: Goblin, dir: Vector2i) -> void:
 	var dest: Vector2i = goblin.grid_cell + dir
@@ -1207,6 +1286,10 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		base_exclude.append(_potion_cell)
 	if _potion2_cell != Vector2i(-1, -1):
 		base_exclude.append(_potion2_cell)
+	base_exclude.append_array(_rune1_cells)
+	base_exclude.append_array(_rune2_cells)
+	base_exclude.append_array(_rune3_cells)
+	base_exclude.append_array(_rune4_cells)
 	for ac3 in _arrow_cells:
 		base_exclude.append(ac3)
 	if _brazier_cells.size() > 0:
@@ -1219,6 +1302,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 	var rune1_to_place: int = int(_rune1_plan.get(_level, 0))
 	var rune2_to_place: int = int(_rune2_plan.get(_level, 0))
 	var rune3_to_place: int = int(_rune3_plan.get(_level, 0))
+	var rune4_to_place: int = int(_rune4_plan.get(_level, 0))
 	for i_a in range(armor_to_place):
 		var a_cell := _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
 		base_exclude.append(a_cell)
@@ -1251,6 +1335,14 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		add_child(node3)
 		node3.place(cell3)
 		_rune3_nodes.append(node3)
+	for i_r4 in range(rune4_to_place):
+		var cell4 := _level_builder.pick_free_interior_cell(grid_size, base_exclude, is_free, has_free_neighbor)
+		base_exclude.append(cell4)
+		_rune4_cells.append(cell4)
+		var node4: Item = _make_item_node("Rune4%d" % i_r4, RUNE4_TEX)
+		add_child(node4)
+		node4.place(cell4)
+		_rune4_nodes.append(node4)
 	# Torch placement: only once per run
 	if not _torch_collected and _level == _torch_target_level:
 		var exclude2: Array[Vector2i] = [player_cell, _key_cell, _sword_cell, _shield_cell, _wand_cell, _bow_cell]
@@ -1268,6 +1360,8 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			exclude2.append(a_cell)
 		for c3 in _rune3_cells:
 			exclude2.append(c3)
+		for c4 in _rune4_cells:
+			exclude2.append(c4)
 		if special_type == &"ring" and _ring_cell != Vector2i.ZERO:
 			exclude2.append(_ring_cell)
 		if _codex_cell != Vector2i.ZERO:
@@ -1367,6 +1461,7 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 		t_exclude.append_array(_rune2_cells)
 		t_exclude.append_array(_armor_cells)
 		t_exclude.append_array(_rune3_cells)
+		t_exclude.append_array(_rune4_cells)
 		if not zcells.is_empty():
 			t_exclude.append(zcells[0])
 		var tcell := _level_builder.pick_free_interior_cell(grid_size, t_exclude, is_free, has_free_neighbor)
@@ -1403,10 +1498,12 @@ func _restart_game() -> void:
 	_rune1_collected_count = 0
 	_rune2_collected_count = 0
 	_rune3_collected_count = 0
+	_rune4_collected_count = 0
 	_ring_cell = Vector2i.ZERO
 	_rune1_cells.clear()
 	_rune2_cells.clear()
 	_rune3_cells.clear()
+	_rune4_cells.clear()
 	_armor_cells.clear()
 	_wand_cell = Vector2i.ZERO
 	_bow_cell = Vector2i.ZERO
@@ -1438,10 +1535,12 @@ func _restart_game() -> void:
 	_rune1_cells.clear()
 	_rune2_cells.clear()
 	_rune3_cells.clear()
+	_rune4_cells.clear()
 	_armor_cells.clear()
 	_last_trap_cell = Vector2i(-1, -1)
 	_web_stuck_turns = 0
 	_arrow_count = 0
+	_rune4_dash_cooldown = 0
 	_active_ranged_weapon = RANGED_NONE
 	for anode in _arrow_nodes:
 		if anode:
@@ -1642,6 +1741,7 @@ func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
 	exclude.append_array(_rune1_cells)
 	exclude.append_array(_rune2_cells)
 	exclude.append_array(_rune3_cells)
+	exclude.append_array(_rune4_cells)
 	exclude.append_array(_armor_cells)
 	var pick_cell := func() -> Vector2i:
 		var c := _level_builder.pick_free_interior_cell(
@@ -1695,6 +1795,13 @@ func _spawn_debug_items_level1(grid_size: Vector2i) -> void:
 		n3.place(c3)
 		_rune3_cells.append(c3)
 		_rune3_nodes.append(n3)
+	if _rune4_nodes.is_empty():
+		var c4: Vector2i = pick_cell.call()
+		var n4: Item = _make_item_node("DebugRune4", RUNE4_TEX)
+		add_child(n4)
+		n4.place(c4)
+		_rune4_cells.append(c4)
+		_rune4_nodes.append(n4)
 	if _armor_nodes.is_empty():
 		var ac: Vector2i = pick_cell.call()
 		var an: Item = _make_item_node("DebugArmor", ARMOR_TEX)
@@ -1955,6 +2062,9 @@ func _has_rune2() -> bool:
 func _has_rune3() -> bool:
 	return _rune3_collected_count > 0
 
+func _has_rune4() -> bool:
+	return _rune4_collected_count > 0
+
 func _attack_bonus() -> int:
 	var bonus := 0
 	if _sword_collected:
@@ -2120,6 +2230,7 @@ func _save_level_state(level: int) -> void:
 	state["rune1_cells"] = []
 	state["rune2_cells"] = []
 	state["rune3_cells"] = []
+	state["rune4_cells"] = []
 	for r1 in _rune1_nodes:
 		if r1 != null and not r1.collected:
 			state["rune1_cells"].append(r1.grid_cell)
@@ -2132,6 +2243,9 @@ func _save_level_state(level: int) -> void:
 	for r3 in _rune3_nodes:
 		if r3 != null and not r3.collected:
 			state["rune3_cells"].append(r3.grid_cell)
+	for r4 in _rune4_nodes:
+		if r4 != null and not r4.collected:
+			state["rune4_cells"].append(r4.grid_cell)
 	state["exit_cell"] = _door_cell
 	state["entrance_cell"] = _entrance_cell
 	state["door_open"] = _door_is_open
@@ -2247,11 +2361,13 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	var r1_state: Array = state.get("rune1_cells", [])
 	var r2_state: Array = state.get("rune2_cells", [])
 	var r3_state: Array = state.get("rune3_cells", [])
+	var r4_state: Array = state.get("rune4_cells", [])
 	_clear_runes()
 	_clear_armor_items()
 	_rune1_cells = []
 	_rune2_cells = []
 	_rune3_cells = []
+	_rune4_cells = []
 	_armor_cells = []
 	for a in armor_state:
 		if a is Vector2i:
@@ -2265,6 +2381,9 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 	for v3 in r3_state:
 		if v3 is Vector2i:
 			_rune3_cells.append(v3)
+	for v4 in r4_state:
+		if v4 is Vector2i:
+			_rune4_cells.append(v4)
 	for rc1 in _rune1_cells:
 		var n1 := _make_item_node("Rune1Restore", RUNE1_TEX)
 		add_child(n1)
@@ -2285,6 +2404,11 @@ func _restore_level_state(level: int, entering_forward: bool) -> void:
 		add_child(n3)
 		n3.place(rc3)
 		_rune3_nodes.append(n3)
+	for rc4 in _rune4_cells:
+		var n4 := _make_item_node("Rune4Restore", RUNE4_TEX)
+		add_child(n4)
+		n4.place(rc4)
+		_rune4_nodes.append(n4)
 	var spawn_cell: Vector2i = _entrance_cell
 	if not entering_forward:
 		spawn_cell = _door_cell
@@ -2786,12 +2910,16 @@ func _clear_runes() -> void:
 		r.queue_free()
 	for r in _rune3_nodes:
 		r.queue_free()
+	for r in _rune4_nodes:
+		r.queue_free()
 	_rune1_nodes.clear()
 	_rune2_nodes.clear()
 	_rune3_nodes.clear()
+	_rune4_nodes.clear()
 	_rune1_cells.clear()
 	_rune2_cells.clear()
 	_rune3_cells.clear()
+	_rune4_cells.clear()
 
 func _reset_items_visibility() -> void:
 	var key_type := _current_key_type()
@@ -2847,6 +2975,10 @@ func _reset_items_visibility() -> void:
 		if r3:
 			r3.collected = r3.collected
 			r3.visible = not r3.collected
+	for r4 in _rune4_nodes:
+		if r4:
+			r4.collected = r4.collected
+			r4.visible = not r4.collected
 	if _ring_node:
 		_ring_node.collected = _ring_collected
 		_ring_node.visible = _current_level_special_type() == &"ring" and not _ring_collected
@@ -2885,7 +3017,7 @@ func _place_bones(grid_size: Vector2i) -> void:
 				continue
 			if not _is_free(c):
 				continue
-			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _armor_cells.has(c) or _debug_cell_blocked(c):
+			if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _rune4_cells.has(c) or _armor_cells.has(c) or _debug_cell_blocked(c):
 				continue
 			if _get_enemy_at(c) != null:
 				continue
@@ -2960,7 +3092,7 @@ func _place_spiderwebs(grid_size: Vector2i) -> void:
 					continue
 				if not _is_free(c):
 					continue
-				if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _potion2_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _armor_cells.has(c):
+				if c == player_cell or c == _key_cell or c == _sword_cell or c == _shield_cell or c == _potion_cell or c == _potion2_cell or c == _codex_cell or c == _ring_cell or _rune1_cells.has(c) or _rune2_cells.has(c) or _rune3_cells.has(c) or _rune4_cells.has(c) or _armor_cells.has(c):
 					continue
 				if _bone_cells.has(c):
 					continue
@@ -3243,6 +3375,7 @@ func _update_hud_icons() -> void:
 	_set_icon_visible(_hud_icon_rune1, show and _has_rune1())
 	_set_icon_visible(_hud_icon_rune2, show and _has_rune2())
 	_set_icon_visible(_hud_icon_rune3, show and _has_rune3())
+	_set_icon_visible(_hud_icon_rune4, show and _has_rune4())
 	_set_icon_visible(_hud_icon_torch, show and _torch_collected)
 	if _hud_icon_ring and RING_TEX:
 		_hud_icon_ring.texture = RING_TEX
@@ -3275,6 +3408,12 @@ func _update_hud_icons() -> void:
 		if _active_ranged_weapon != RANGED_WAND:
 			wand_mod = Color(0.8, 0.8, 0.8, 1)
 		_hud_icon_wand.modulate = wand_mod
+	if _hud_icon_rune4 and RUNE4_TEX:
+		_hud_icon_rune4.texture = RUNE4_TEX
+		var rune4_mod := Color(1, 1, 1, 1)
+		if _rune4_dash_cooldown > 0:
+			rune4_mod = Color(0.7, 0.7, 0.7, 1)
+		_hud_icon_rune4.modulate = rune4_mod
 	if _hud_icon_bow:
 		_hud_icon_bow.modulate = bow_mod
 	_set_icon_visible(_hud_icon_bow, show and _bow_collected)
@@ -3508,6 +3647,36 @@ func _bow_missed(origin: Vector2i, target: Vector2i) -> bool:
 	var miss_chance: float = clampf((dist - 1) * 0.05, 0.0, 0.25)
 	return _rng.randf() < miss_chance
 
+func _show_dash_trail(cells: Array[Vector2i]) -> void:
+	if cells.size() < 2 or _decor == null:
+		return
+	var line: Line2D = null
+	if not _dash_trail_pool.is_empty():
+		line = _dash_trail_pool.pop_back()
+	if line == null:
+		line = Line2D.new()
+		line.width = 3
+		line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		line.z_index = 40
+		line.z_as_relative = false
+		_decor.add_child(line)
+	line.clear_points()
+	for cell in cells:
+		var pos := Grid.cell_to_world(cell) + Vector2(Grid.CELL_SIZE / 2, Grid.CELL_SIZE / 2)
+		line.add_point(pos)
+	line.default_color = Color(1, 0.8, 0.4, 0.45)
+	line.visible = true
+	_dash_trail_active.append(line)
+	var tw := get_tree().create_tween()
+	tw.tween_property(line, "modulate:a", 0.0, 0.18)
+	tw.finished.connect(func():
+		line.visible = false
+		line.modulate.a = 1.0
+		_dash_trail_active.erase(line)
+		_dash_trail_pool.append(line)
+	)
+
 func _fire_projectile(origin: Vector2i, end_cell: Vector2i, color: Color) -> void:
 	var line: Line2D = null
 	if not _projectile_pool.is_empty():
@@ -3715,6 +3884,8 @@ func _set_level_item_textures() -> void:
 		_hud_icon_rune2.texture = RUNE2_TEX
 	if _hud_icon_rune3 and RUNE3_TEX:
 		_hud_icon_rune3.texture = RUNE3_TEX
+	if _hud_icon_rune4 and RUNE4_TEX:
+		_hud_icon_rune4.texture = RUNE4_TEX
 	if _hud_icon_torch and TORCH_TEX:
 		_hud_icon_torch.texture = TORCH_TEX
 	if _hud_icon_ring and RING_TEX:
@@ -3850,6 +4021,7 @@ func _setup_input() -> void:
 		["start", [Key.KEY_ENTER]],
 		["use_potion", [Key.KEY_Q]],
 		["switch_ranged", [Key.KEY_R]],
+		["dash_attack", [Key.KEY_E]],
 		["ranged_dir_up", [Key.KEY_KP_8, Key.KEY_I]],
 		["ranged_dir_down", [Key.KEY_KP_2, Key.KEY_K]],
 		["ranged_dir_left", [Key.KEY_KP_4, Key.KEY_J]],
@@ -3879,6 +4051,7 @@ func _prepare_run_layout() -> void:
 	_rune1_plan.clear()
 	_rune2_plan.clear()
 	_rune3_plan.clear()
+	_rune4_plan.clear()
 	_arrow_plan.clear()
 	_tileset_plan.clear()
 	var levels: Array[int] = []
@@ -3914,6 +4087,7 @@ func _prepare_run_layout() -> void:
 	var rune1_total: int = _rng.randi_range(1, 3)
 	var rune2_total: int = _rng.randi_range(1, 3)
 	var rune3_total: int = 1
+	var rune4_total: int = 1
 	for i_a in range(armor_total):
 		var al: int = _rng.randi_range(1, _max_level)
 		_armor_plan[al] = _armor_plan.get(al, 0) + 1
@@ -3926,6 +4100,9 @@ func _prepare_run_layout() -> void:
 	for i5 in range(rune3_total):
 		var rl3: int = _rng.randi_range(1, _max_level)
 		_rune3_plan[rl3] = _rune3_plan.get(rl3, 0) + 1
+	for i6 in range(rune4_total):
+		var rl4: int = _rng.randi_range(1, _max_level)
+		_rune4_plan[rl4] = _rune4_plan.get(rl4, 0) + 1
 	var arrow_levels: Array[int] = []
 	for i6 in range(1, _max_level + 1):
 		arrow_levels.append(i6)
@@ -3955,6 +4132,7 @@ func _prepare_run_layout() -> void:
 		_rune1_plan[1] = max(1, _rune1_plan.get(1, 0))
 		_rune2_plan[1] = max(1, _rune2_plan.get(1, 0))
 		_rune3_plan[1] = max(1, _rune3_plan.get(1, 0))
+		_rune4_plan[1] = max(1, _rune4_plan.get(1, 0))
 		_arrow_plan[1] = max(1, _arrow_plan.get(1, 0))
 		_wand_level = 1
 		_bow_level = 1
