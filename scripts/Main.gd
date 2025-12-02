@@ -219,6 +219,10 @@ var _tileset: TileSet
 var _fov_overlay: Node2D
 var _fov_visible: Array[bool] = []
 var _fov_dist: Array[float] = []
+var _wall_cache: Array[bool] = []
+var _fov_dirty: bool = false
+var _last_player_cell: Vector2i = Vector2i(-1, -1)
+var _cached_player_cell: Vector2i = Vector2i(-1, -1)
 
 func _sheet() -> Image:
 	if _sheet_image == null:
@@ -644,8 +648,13 @@ func _process(_delta: float) -> void:
 			_restart_game()
 		return
 	# FOV overlay updates only when player moves or world changes
-	var wp := Vector2i(round(player.global_position.x), round(player.global_position.y))
-	var cp := Grid.world_to_cell(player.global_position)
+	# Cache player cell position to avoid recalculating every frame
+	var cp := _cached_player_cell
+	var new_cp := Grid.world_to_cell(player.global_position)
+	if new_cp != cp:
+		_cached_player_cell = new_cp
+		_fov_dirty = true
+	cp = new_cp
 	if _game_over:
 		# Game over state; show overlay and wait for Enter to restart
 		if _state != STATE_GAME_OVER:
@@ -789,6 +798,7 @@ func _process(_delta: float) -> void:
 		print("GOT TORCH (+4 SIGHT)")
 		if _torch_node:
 			_torch_node.collect()
+		_fov_dirty = true
 		_update_fov()
 		_play_sfx(SFX_PICKUP2)
 		_blink_node(player)
@@ -893,6 +903,8 @@ func _process(_delta: float) -> void:
 		_restart_game()
 
 func _on_player_moved(new_cell: Vector2i) -> void:
+	_cached_player_cell = new_cell
+	_fov_dirty = true
 	var skeleton_count_before := _skeletons.size()
 	_maybe_spawn_skeleton_from_bones(new_cell)
 	_advance_enemies_and_update(skeleton_count_before)
@@ -997,7 +1009,10 @@ func _advance_enemies_and_update(skip_skeletons_from: int) -> void:
 	for imp: Imp in _imps:
 		if imp.alive and _enemy_can_act(imp):
 			_imp_take_turn(imp)
-	_update_fov()
+	# Only update FOV if dirty (player moved or explicitly requested)
+	if _fov_dirty:
+		_update_fov()
+		_fov_dirty = false
 	if _rune4_dash_cooldown > 0:
 		_rune4_dash_cooldown = max(0, _rune4_dash_cooldown - 1)
 	if prev_dash_cd != _rune4_dash_cooldown:
@@ -1227,6 +1242,7 @@ func _build_maps(grid_size: Vector2i) -> void:
 		FLOOR_ALPHA_MIN,
 		FLOOR_ALPHA_MAX
 	)
+	_rebuild_wall_cache()
 
 func _place_random_entities(grid_size: Vector2i) -> void:
 	var player_cell := Grid.world_to_cell(player.global_position)
@@ -1763,6 +1779,8 @@ func _restart_game() -> void:
 	_place_bones(grid_size)
 	_place_spiderwebs(grid_size)
 	_place_door(grid_size)
+	# Force FOV update immediately after placing player
+	_fov_dirty = false  # Clear dirty flag since we're updating now
 	_update_fov()
 	# Show entities
 	if _key_node:
@@ -2746,11 +2764,12 @@ func _restore_walls_from_state(state: Dictionary) -> void:
 	for c in walls_map.get_used_cells(0):
 		if c.x > 0 and c.y > 0 and c.x < _grid_size.x - 1 and c.y < _grid_size.y - 1:
 			walls_map.set_cell(0, c, -1, Vector2i.ZERO)
-	for w in walls:
-		var cell: Vector2i = w.get("cell", Vector2i.ZERO)
-		var sid: int = w.get("sid", -1)
-		if sid != -1:
-			walls_map.set_cell(0, cell, sid, TILE_WALL)
+		for w in walls:
+			var cell: Vector2i = w.get("cell", Vector2i.ZERO)
+			var sid: int = w.get("sid", -1)
+			if sid != -1:
+				walls_map.set_cell(0, cell, sid, TILE_WALL)
+		_rebuild_wall_cache()
 
 func _start_game() -> void:
 	# Hide title, show HUD, reset fade
@@ -2842,6 +2861,8 @@ func _start_game() -> void:
 	_place_bones(grid_size)
 	_place_spiderwebs(grid_size)
 	_place_door(grid_size)
+	# Force FOV update immediately after placing player
+	_fov_dirty = false  # Clear dirty flag since we're updating now
 	_update_fov()
 	# Enable controls
 	if player.has_method("set_control_enabled"):
@@ -3099,6 +3120,9 @@ func _ensure_fov_overlay() -> void:
 	_fov_visible.fill(false)
 	_fov_dist.fill(1e9)
 	(_fov_overlay as Node).call("set_grid", _grid_size)
+	# Pass wall cache to FOV overlay so it can exclude walls from darkening
+	if _fov_overlay.has_method("set_wall_cache"):
+		_fov_overlay.set_wall_cache(_wall_cache)
 	_update_fov()
 
 func _update_fov() -> void:
@@ -3110,13 +3134,22 @@ func _update_fov() -> void:
 		_fov_dist.resize(total)
 	_fov_visible.fill(false)
 	_fov_dist.fill(1e9)
-	var center: Vector2i = Grid.world_to_cell(player.global_position)
+	# Use cached player cell instead of recalculating
+	var center: Vector2i = _cached_player_cell
+	if center == Vector2i(-1, -1):
+		center = Grid.world_to_cell(player.global_position)
+		_cached_player_cell = center
 	var bonus: int = (4 if _torch_collected else 0)
 	_apply_light_source(center, SIGHT_OUTER_TILES + bonus)
 	for bc in _brazier_cells:
 		_apply_light_source(bc, 3)
 	if _fov_overlay:
-		(_fov_overlay as Node).call_deferred("update_fov", _fov_visible, _fov_dist, SIGHT_INNER_TILES + bonus, SIGHT_OUTER_TILES + bonus, SIGHT_MAX_DARK)
+		# Use direct call instead of deferred to ensure FOV updates immediately on level start
+		# Pass wall cache so FOV overlay can exclude walls from darkening
+		if _fov_overlay.has_method("update_fov"):
+			_fov_overlay.update_fov(_fov_visible, _fov_dist, SIGHT_INNER_TILES + bonus, SIGHT_OUTER_TILES + bonus, SIGHT_MAX_DARK, _wall_cache)
+		else:
+			(_fov_overlay as Node).call_deferred("update_fov", _fov_visible, _fov_dist, SIGHT_INNER_TILES + bonus, SIGHT_OUTER_TILES + bonus, SIGHT_MAX_DARK, _wall_cache)
 
 func _apply_light_source(center: Vector2i, radius: int) -> void:
 	if not _in_bounds(center):
@@ -3128,30 +3161,46 @@ func _apply_light_source(center: Vector2i, radius: int) -> void:
 	var xmax: int = min(_grid_size.x - 1, center.x + radius)
 	var ymin: int = max(0, center.y - radius)
 	var ymax: int = min(_grid_size.y - 1, center.y + radius)
+	# Optimized: Pre-calculate distance squared to avoid repeated sqrt calls
+	var radius_sq: float = float(radius * radius)
+	# Reuse Bresenham line buffer to reduce allocations
+	var line_buffer: Array[Vector2i] = []
 	for y in range(ymin, ymax + 1):
-			for x in range(xmin, xmax + 1):
-				var c: Vector2i = Vector2i(x, y)
-				var dtiles: float = float(max(abs(c.x - center.x), abs(c.y - center.y)))
-				if dtiles > float(radius):
-					continue
-				var line: Array[Vector2i] = _bresenham(center, c)
-				for p in line:
-					if not _in_bounds(p):
-						break
-					var i: int = p.y * _grid_size.x + p.x
-					var dx: int = p.x - center.x
-					var dy: int = p.y - center.y
-					var dist: float = sqrt(float(dx * dx + dy * dy))
-					_fov_visible[i] = true
-					_fov_dist[i] = min(_fov_dist[i], dist)
-					if _is_wall(p) and p != center:
-						break
+		for x in range(xmin, xmax + 1):
+			var c: Vector2i = Vector2i(x, y)
+			var dx: int = c.x - center.x
+			var dy: int = c.y - center.y
+			var dist_sq: float = float(dx * dx + dy * dy)
+			# Early exit if outside radius (using squared distance to avoid sqrt)
+			if dist_sq > radius_sq:
+				continue
+			var idx: int = c.y * _grid_size.x + c.x
+			# Use optimized Bresenham that writes to buffer
+			_bresenham_to_buffer(center, c, line_buffer)
+			var blocked: bool = false
+			for p in line_buffer:
+				if not _in_bounds(p):
+					blocked = true
+					break
+				# Use cached wall check
+				if _is_wall(p) and p != center:
+					blocked = true
+					break
+			if not blocked:
+				var dist: float = sqrt(dist_sq)
+				_fov_visible[idx] = true
+				_fov_dist[idx] = min(_fov_dist[idx], dist)
 
 func _in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < _grid_size.x and cell.y < _grid_size.y
 
 func _bresenham(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	var points: Array[Vector2i] = []
+	_bresenham_to_buffer(a, b, points)
+	return points
+
+func _bresenham_to_buffer(a: Vector2i, b: Vector2i, buffer: Array[Vector2i]) -> void:
+	buffer.clear()
 	var x0: int = a.x
 	var y0: int = a.y
 	var x1: int = b.x
@@ -3162,7 +3211,7 @@ func _bresenham(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	var sy: int = (1 if y0 < y1 else -1)
 	var err: int = dx + dy
 	while true:
-		points.append(Vector2i(x0, y0))
+		buffer.append(Vector2i(x0, y0))
 		if x0 == x1 and y0 == y1:
 			break
 		var e2: int = 2 * err
@@ -3172,7 +3221,6 @@ func _bresenham(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 		if e2 <= dx:
 			err += dx
 			y0 += sy
-	return points
 
 func _spawn_goblin_at(cell: Vector2i) -> void:
 	var node: Goblin = GOBLIN_SCENE.instantiate() as Goblin
@@ -3768,6 +3816,8 @@ func _travel_to_level(target_level: int, entering_forward: bool) -> void:
 	if _hud_level:
 		_hud_level.text = "FLR: %d" % _level
 	_log_action("Traveled to Floor %d" % _level)
+	# Force FOV update immediately after level transition
+	_fov_dirty = false  # Clear dirty flag since we're updating now
 	_update_fov()
 	_set_world_visible(true)
 	print("[DEBUG] Travel complete -> level ", _level, " key_on_level=", _key_on_level, " key_collected=", _key_collected, " door_cell=", _door_cell, " entrance_cell=", _entrance_cell)
@@ -4391,9 +4441,23 @@ func _place_random_inner_walls(grid_size: Vector2i) -> void:
 			return true
 		return false
 	_level_builder.place_random_inner_walls(grid_size, walls_map, _current_wall_sources, TILE_WALL, is_blocked)
+	_rebuild_wall_cache()
+
+func _rebuild_wall_cache() -> void:
+	if _grid_size == Vector2i.ZERO:
+		return
+	var total: int = _grid_size.x * _grid_size.y
+	_wall_cache.resize(total)
+	for y in range(_grid_size.y):
+		for x in range(_grid_size.x):
+			var idx: int = y * _grid_size.x + x
+			_wall_cache[idx] = walls_map.get_cell_source_id(0, Vector2i(x, y)) != -1
 
 func _is_wall(cell: Vector2i) -> bool:
-	return walls_map.get_cell_source_id(0, cell) != -1
+	if not _in_bounds(cell):
+		return false
+	var idx: int = cell.y * _grid_size.x + cell.x
+	return _wall_cache[idx]
 
 func _in_interior(cell: Vector2i) -> bool:
 	return cell.x >= 1 and cell.y >= 1 and cell.x < _grid_size.x - 1 and cell.y < _grid_size.y - 1
@@ -4435,6 +4499,9 @@ func _place_player(cell: Vector2i) -> void:
 		player.teleport_to_cell(cell)
 	else:
 		player.global_position = Grid.cell_to_world(cell)
+	# Update cached player cell immediately when player is placed
+	_cached_player_cell = cell
+	_fov_dirty = true
 
 func _make_item_node(item_name: String, tex: Texture2D) -> Item:
 	var item: Item = Item.new()
@@ -4653,7 +4720,7 @@ func _remove_enemy_from_map(enemy: Enemy) -> void:
 
 func _get_enemy_at(cell: Vector2i) -> Enemy:
 	var enemy: Enemy = _enemy_map.get(cell, null)
-	if enemy != null and enemy is Enemy and enemy.alive:
+	if enemy != null and enemy.alive:
 		return enemy
 	return null
 
