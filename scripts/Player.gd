@@ -104,6 +104,9 @@ func _is_blocked(cell: Vector2i) -> bool:
 	if parent and parent.has_method("is_in_bounds"):
 		if not parent.is_in_bounds(cell):
 			return true
+	if parent and parent.has_method("is_cell_blocked"):
+		if parent.is_cell_blocked(cell):
+			return true
 	# Allow parent scene to override passability (e.g., door tile)
 	if parent and parent.has_method("is_passable"):
 		if parent.is_passable(cell):

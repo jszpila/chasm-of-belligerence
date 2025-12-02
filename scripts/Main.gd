@@ -117,6 +117,8 @@ var BOW_TEX: Texture2D = null
 var ARROW_TEX: Texture2D = null
 var BONE_TEXTURES: Array[Texture2D] = []
 var SPIDERWEB_TEXTURES: Dictionary = {}
+const BRAZIER_LIGHT_SIZE: int = 64
+var _brazier_light_texture: Texture2D
 var FLOOR_TEXTURES_A: Array[Texture2D] = []
 var FLOOR_TEXTURES_B: Array[Texture2D] = []
 var FLOOR_TEXTURES_C: Array[Texture2D] = []
@@ -239,7 +241,9 @@ func _sheet_tex(key: StringName, pos: Vector2i, mask_black: bool) -> Texture2D:
 				var c := img.get_pixel(x, y)
 				if c.r <= 0.01 and c.g <= 0.01 and c.b <= 0.01:
 					c.a = 0.0
-					img.set_pixel(x, y, c)
+				if y == 0 or x == 0:
+					c.a = 0.0
+				img.set_pixel(x, y, c)
 	var tex := ImageTexture.create_from_image(img)
 	_sheet_tex_cache[key] = tex
 	return tex
@@ -1415,6 +1419,10 @@ func _place_random_entities(grid_size: Vector2i) -> void:
 			b_exclude.append(_cheese_cell)
 		for ac in _arrow_cells:
 			b_exclude.append(ac)
+		if not _bone_cells.is_empty():
+			for bone_cell in _bone_cells.keys():
+				if bone_cell is Vector2i:
+					b_exclude.append(bone_cell as Vector2i)
 		for i_b in range(brazier_count):
 			var b_cell := _level_builder.pick_free_interior_cell(grid_size, b_exclude, is_free, has_free_neighbor)
 			b_exclude.append(b_cell)
@@ -1787,6 +1795,7 @@ func _restart_game() -> void:
 	# Hide game over overlay and mark state
 	_over_layer.visible = false
 	_state = STATE_PLAYING
+	_set_hud_layer_visible(true)
 	_set_world_visible(true)
 	_play_sfx(SFX_START)
 	# Fade back in
@@ -3421,6 +3430,23 @@ func _clear_braziers() -> void:
 	_brazier_nodes.clear()
 	_brazier_cells.clear()
 
+func _ensure_brazier_light_texture() -> Texture2D:
+	if _brazier_light_texture != null:
+		return _brazier_light_texture
+	var img := Image.create(BRAZIER_LIGHT_SIZE, BRAZIER_LIGHT_SIZE, false, Image.FORMAT_RGBA8)
+	var center: float = BRAZIER_LIGHT_SIZE / 2.0
+	for y in range(BRAZIER_LIGHT_SIZE):
+		for x in range(BRAZIER_LIGHT_SIZE):
+			var dx := (x + 0.5) - center
+			var dy := (y + 0.5) - center
+			var dist: float = sqrt(dx * dx + dy * dy) / center
+			var falloff: float = clamp(1.0 - dist, 0.0, 1.0)
+			var alpha: float = falloff * falloff
+			var col := Color(1.0, 1.0, 0.8, alpha)
+			img.set_pixel(x, y, col)
+	_brazier_light_texture = ImageTexture.create_from_image(img)
+	return _brazier_light_texture
+
 func _clear_spiderwebs() -> void:
 	for s in _spiderweb_nodes:
 		if s:
@@ -3441,12 +3467,58 @@ func _spawn_brazier(cell: Vector2i) -> void:
 	var light := PointLight2D.new()
 	light.position = Vector2(6, 6)
 	light.energy = 0.8
+	light.color = Color(1.0, 0.6, 0.3)
 	light.texture_scale = 0.35 # approximate 3 tiles of reach
 	light.shadow_enabled = false
 	node.add_child(light)
+	var light_sprite := Sprite2D.new()
+	light_sprite.texture = _ensure_brazier_light_texture()
+	light_sprite.centered = true
+	light_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	light_sprite.modulate = Color(1.0, 0.6, 0.3, 0.15)
+	light_sprite.z_index = 0
+	light_sprite.scale = Vector2(2.0, 2.0)
+	light_sprite.position = Vector2(Grid.CELL_SIZE / 2.0, Grid.CELL_SIZE / 2.0)
+	var light_material := CanvasItemMaterial.new()
+	light_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	light_sprite.material = light_material
+	node.add_child(light_sprite)
 	_decor.add_child(node)
 	_brazier_nodes.append(node)
+	_schedule_brazier_flicker(light)
+	_schedule_brazier_light_flicker(light_sprite)
 
+func _schedule_brazier_flicker(light: PointLight2D) -> void:
+	if light == null or not light.is_inside_tree():
+		return
+	var target_alpha := 0.4 + _rng.randf_range(0.0, 0.4)
+	var target_scale := 0.3 + _rng.randf_range(0.0, 0.25)
+	var target_energy := 0.5 + _rng.randf_range(0.0, 0.5)
+	var duration := 0.18 + _rng.randf_range(0.05, 0.45)
+	var tw := get_tree().create_tween()
+	tw.tween_property(light, "energy", target_energy, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(light, "texture_scale", target_scale, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(light, "color:a", target_alpha, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.finished.connect(Callable(self, "_on_brazier_flicker_finished").bind(light))
+
+func _schedule_brazier_light_flicker(light_sprite: Sprite2D) -> void:
+	if light_sprite == null or not light_sprite.is_inside_tree():
+		return
+	var target_alpha := 0.3 + _rng.randf_range(0.0, 0.3)
+	var duration := 0.12 + _rng.randf_range(0.05, 0.25)
+	var tw := get_tree().create_tween()
+	tw.tween_property(light_sprite, "modulate:a", target_alpha, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.finished.connect(Callable(self, "_on_brazier_light_flicker_finished").bind(light_sprite))
+
+func _on_brazier_flicker_finished(light: PointLight2D) -> void:
+	if light == null or not light.is_inside_tree():
+		return
+	_schedule_brazier_flicker(light)
+
+func _on_brazier_light_flicker_finished(light_sprite: Sprite2D) -> void:
+	if light_sprite == null or not light_sprite.is_inside_tree():
+		return
+	_schedule_brazier_light_flicker(light_sprite)
 func _place_spiderwebs(grid_size: Vector2i) -> void:
 	_clear_spiderwebs()
 	var corner_defs := [
@@ -4306,6 +4378,9 @@ func is_passable(cell: Vector2i) -> bool:
 	# Allow stepping onto the door cell only when it is actually open
 	return _door_is_open and cell == _door_cell
 
+func is_cell_blocked(cell: Vector2i) -> bool:
+	return _brazier_cells.has(cell) or _debug_cell_blocked(cell)
+
 func is_in_bounds(cell: Vector2i) -> bool:
 	return _in_bounds(cell)
 
@@ -4328,6 +4403,8 @@ func _in_interior(cell: Vector2i) -> bool:
 func _is_free(cell: Vector2i) -> bool:
 	if not _in_interior(cell) or _is_wall(cell):
 		return false
+	if is_cell_blocked(cell):
+		return false
 	if _get_enemy_at(cell) != null:
 		return false
 	if _trap_at(cell) != null:
@@ -4336,6 +4413,8 @@ func _is_free(cell: Vector2i) -> bool:
 
 func _can_enemy_step(cell: Vector2i, mover: Enemy) -> bool:
 	if not _in_interior(cell) or _is_wall(cell):
+		return false
+	if is_cell_blocked(cell):
 		return false
 	var occupant := _get_enemy_at(cell)
 	if occupant != null and occupant != mover:

@@ -34,6 +34,7 @@ func _draw() -> void:
 	var total: int = grid_size.x * grid_size.y
 	if vis_map.size() != total:
 		return
+	# Draw visibility inside the playable grid
 	for y in range(grid_size.y):
 		for x in range(grid_size.x):
 			var idx: int = y * grid_size.x + x
@@ -53,3 +54,12 @@ func _draw() -> void:
 				continue
 			var pos: Vector2 = Vector2(float(x * cell_size), float(y * cell_size))
 			draw_rect(Rect2(pos, Vector2(float(cell_size), float(cell_size))), Color(0, 0, 0, alpha), true)
+	# Hard clip light outside the grid so braziers and other sources don't bleed past walls.
+	var world_w: float = float(grid_size.x * cell_size)
+	var world_h: float = float(grid_size.y * cell_size)
+	var pad: float = float(cell_size * 8)
+	var clip_color := Color(0, 0, 0, 1.0)
+	draw_rect(Rect2(Vector2(-pad, -pad), Vector2(world_w + pad * 2.0, pad)), clip_color, true)
+	draw_rect(Rect2(Vector2(-pad, world_h), Vector2(world_w + pad * 2.0, pad)), clip_color, true)
+	draw_rect(Rect2(Vector2(-pad, 0), Vector2(pad, world_h)), clip_color, true)
+	draw_rect(Rect2(Vector2(world_w, 0), Vector2(pad, world_h)), clip_color, true)
