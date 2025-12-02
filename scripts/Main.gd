@@ -241,8 +241,6 @@ func _sheet_tex(key: StringName, pos: Vector2i, mask_black: bool) -> Texture2D:
 				var c := img.get_pixel(x, y)
 				if c.r <= 0.01 and c.g <= 0.01 and c.b <= 0.01:
 					c.a = 0.0
-				if y == 0 or x == 0:
-					c.a = 0.0
 				img.set_pixel(x, y, c)
 	var tex := ImageTexture.create_from_image(img)
 	_sheet_tex_cache[key] = tex
